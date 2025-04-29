@@ -1,3 +1,5 @@
 antena/
 .vscode/
-.qtcreator/
+.qtcreator/ 
+
+__pycache__/
