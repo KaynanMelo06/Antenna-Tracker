@@ -1,117 +1,145 @@
 # -*- coding: utf-8 -*-
-import sys
-import cv2
-import numpy as np
-import math
-from PyQt5.QtWidgets import QApplication, QMainWindow, QLabel, QVBoxLayout, QWidget
-from PyQt5.QtCore import QTimer, Qt, pyqtSignal
-from PyQt5.QtGui import QImage, QPixmap
+# Declaração de codificação para suportar caracteres especiais
+import sys  # Módulo para funcionalidades do sistema
+import cv2  # OpenCV para processamento de imagem
+import numpy as np  # NumPy para operações numericas
+from PyQt5.QtWidgets import QApplication, QMainWindow  # Componentes basicos do Qt
+from PyQt5.QtCore import QTimer, Qt  # Temporizador e constantes Qt
+from PyQt5.QtGui import QImage, QPixmap  # Classes para manipulação de imagens
+from src.ui.interface import Ui_MainWindow  # Interface gerada pelo Qt Designer
+from src.backend.colorfilter import ColorFilter  # Importa a classe de filtro de cor
 
-class AntennaTracker(QMainWindow):
+class HSVApp(QMainWindow):
     def __init__(self):
-        super().__init__()
+        super().__init__()  # Inicializa a classe base QMainWindow
         
-        # Configurações iniciais
-        self.setWindowTitle("Rastreador de Antena")
-        self.central_widget = QWidget()
-        self.setCentralWidget(self.central_widget)
-        self.layout = QVBoxLayout()
-        self.central_widget.setLayout(self.layout)
-        
-        # Labels para exibição
-        self.image_label = QLabel()
-        self.angle_label = QLabel("Angulo: 0")
-        self.layout.addWidget(self.image_label)
-        self.layout.addWidget(self.angle_label)
-        
-        # Cores das tags (HSV)
-        self.tag_x_color = {
-            'lower': np.array([0, 100, 100]),  # Exemplo: Vermelho
-            'upper': np.array([10, 255, 255])
+        # Configuração da interface do usuario
+        self.ui = Ui_MainWindow()  # Cria instância da interface
+        self.ui.setupUi(self)  # Configura a interface na janela principal
+
+        # Valores padrão para reset
+        self.default_values = {
+            'h_min': 0,
+            'h_max': 179,
+            's_min': 0,
+            's_max': 255,
+            'v_min': 0,
+            'v_max': 255
         }
-        self.tag_y_color = {
-            'lower': np.array([60, 100, 100]),  # Exemplo: Verde
-            'upper': np.array([80, 255, 255])
-        }
-        
-        # Captura de vídeo
+
+        # Inicializa a captura de video da webcam (dispositivo 0)
         self.cap = cv2.VideoCapture(0)
-        self.timer = QTimer()
-        self.timer.timeout.connect(self.update_frame)
-        self.timer.start(30)  # ~30 FPS
 
-    def detect_tags(self, frame):
-        #Detecta as tags X e Y e retorna seus centros."""
-        hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-        
-        # Máscaras para as tags
-        mask_x = cv2.inRange(hsv, self.tag_x_color['lower'], self.tag_x_color['upper'])
-        mask_y = cv2.inRange(hsv, self.tag_y_color['lower'], self.tag_y_color['upper'])
-        
-        # Encontra contornos
-        contours_x, _ = cv2.findContours(mask_x, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        contours_y, _ = cv2.findContours(mask_y, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        
-        # Calcula centros
-        center_x = self.get_center(contours_x)
-        center_y = self.get_center(contours_y)
-        
-        return center_x, center_y
+        # Configuração do temporizador para atualização continua
+        self.timer = QTimer()  # Cria um temporizador Qt
+        self.timer.timeout.connect(self.update_frame)  # Conecta ao metodo de atualização
+        self.timer.start(30)  # Intervalo de atualização em ms (~33fps)
 
-    def get_center(self, contours):
-        #Retorna o centro do maior contorno encontrado."""
-        if contours:
-            largest_contour = max(contours, key=cv2.contourArea)
-            M = cv2.moments(largest_contour)
-            if M["m00"] != 0:
-                return (int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"]))
-        return None
+        # Dicionario para acesso facil aos sliders da interface
+        self.sliders = {
+            'h_min': self.ui.slider_h_min,  # Slider de Hue minimo
+            'h_max': self.ui.slider_h_max,  # Slider de Hue maximo
+            's_min': self.ui.slider_s_min,  # Slider de Saturação minimo
+            's_max': self.ui.slider_s_max,  # Slider de Saturação maximo
+            'v_min': self.ui.slider_v_min,  # Slider de Valor (brilho) minimo
+            'v_max': self.ui.slider_v_max   # Slider de Valor (brilho) maximo
+        }
+        
+        # Dicionario para acesso facil aos labels de valores
+        self.labels = {
+            'h_min': self.ui.label_h_min,  # Label para H Min
+            'h_max': self.ui.label_h_max,  # Label para H Max
+            's_min': self.ui.label_s_min,  # Label para S Min
+            's_max': self.ui.label_s_max,  # Label para S Max
+            'v_min': self.ui.label_v_min,  # Label para V Min
+            'v_max': self.ui.label_v_max   # Label para V Max
+        }
 
-    def calculate_angle(self, center_x, center_y):
-        #Calcula o ângulo entre as tags (em graus)."""
-        if center_x and center_y:
-            dx = center_y[0] - center_x[0]
-            dy = center_y[1] - center_x[1]
-            angle = math.degrees(math.atan2(dy, dx))
-            return angle if angle >= 0 else angle + 360
-        return 0
+        # Configura as conexões entre sliders e labels
+        self.connect_sliders()
+        
+        # Conecta o botão de reset
+        self.ui.btn_reset.clicked.connect(self.reset_values)
+
+        self.color_filter = ColorFilter()  # Instancia o filtro de cor 
+
+    def reset_values(self):
+        #Reseta todos os sliders para os valores padrão#
+        for key, slider in self.sliders.items():
+            slider.setValue(self.default_values[key])
+        
+        # Atualiza os labels manualmente (opcional, pois os valueChanged devem disparar)
+        for key, label in self.labels.items():
+            label.setText(f"{key.split('_')[0].upper()} {key.split('_')[1]}: {self.default_values[key]}")
+
+    def connect_sliders(self):
+        #Conecta cada slider ao seu label correspondente para atualização em tempo real
+        self.ui.slider_h_min.valueChanged.connect(
+            lambda v: self.ui.label_h_min.setText(f"H Min: {v}"))
+        self.ui.slider_h_max.valueChanged.connect(
+            lambda v: self.ui.label_h_max.setText(f"H Max: {v}"))
+        self.ui.slider_s_min.valueChanged.connect(
+            lambda v: self.ui.label_s_min.setText(f"S Min: {v}"))
+        self.ui.slider_s_max.valueChanged.connect(
+            lambda v: self.ui.label_s_max.setText(f"S Max: {v}"))
+        self.ui.slider_v_min.valueChanged.connect(
+            lambda v: self.ui.label_v_min.setText(f"V Min: {v}"))
+        self.ui.slider_v_max.valueChanged.connect(
+            lambda v: self.ui.label_v_max.setText(f"V Max: {v}"))
 
     def update_frame(self):
+        #Captura e processa cada frame da câmera#
+        # Lê um frame da câmera
         ret, frame = self.cap.read()
-        if not ret:
-            return
-        
-        # Detecta tags e calcula ângulo
-        center_x, center_y = self.detect_tags(frame)
-        angle = self.calculate_angle(center_x, center_y)
-        
-        # Desenha marcadores
-        if center_x:
-            cv2.circle(frame, center_x, 10, (0, 0, 255), -1)  # Tag X (vermelho)
-        if center_y:
-            cv2.circle(frame, center_y, 10, (0, 255, 0), -1)  # Tag Y (verde)
-        
-        # Exibe ângulo
-        self.angle_label.setText(f"Ângulo: {angle:.2f}°")
-        
-        # Mostra a imagem
-        self.display_image(frame)
+        if not ret:  # Se falhar ao capturar o frame
+            return  # Sai da função
 
-    def display_image(self, img):
-        #Converte e exibe a imagem do OpenCV no QLabel."""
+        # Converte o frame de BGR (OpenCV) para HSV
+        hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+
+        # Obtem os valores atuais dos sliders
+        h_min = self.sliders['h_min'].value()  # Valor atual do Hue minimo
+        h_max = self.sliders['h_max'].value()  # Valor atual do Hue maximo
+        s_min = self.sliders['s_min'].value()  # Valor atual da Saturação minima
+        s_max = self.sliders['s_max'].value()  # Valor atual da Saturação maxima
+        v_min = self.sliders['v_min'].value()  # Valor atual do Valor minimo
+        v_max = self.sliders['v_max'].value()  # Valor atual do Valor maximo
+
+        
+        mask = self.color_filter.hsv_filter(hsv, (h_min, h_max), (s_min, s_max), (v_min, v_max))   # Aplica o filtro HSV
+        
+        #Criar botão para essa função
+        frame = self.color_filter.apply_contours(mask, frame)
+        # Aplica a mascara ao frame original
+        result = cv2.bitwise_and(frame, frame, mask=mask)
+
+        # Exibe o resultado processado
+        self.show_image(result)
+
+    def show_image(self, img):
+        #Exibe uma imagem OpenCV no QLabel da interface#
+        # Converte de BGR (OpenCV) para RGB (Qt)
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        h, w, ch = img.shape
-        bytes_per_line = ch * w
-        q_img = QImage(img.data, w, h, bytes_per_line, QImage.Format_RGB888)
-        self.image_label.setPixmap(QPixmap.fromImage(q_img))
+        
+        # Obtem dimensões da imagem
+        height, width, channel = img.shape
+        step = channel * width  # Calcula bytes por linha
+        
+        # Cria QImage a partir dos dados numpy
+        q_img = QImage(img.data, width, height, step, QImage.Format_RGB888)
+        
+        # Converte para QPixmap e exibe no label
+        self.ui.label_output.setPixmap(QPixmap.fromImage(q_img))
 
     def closeEvent(self, event):
-        self.cap.release()
-        cv2.destroyAllWindows()
-        event.accept()
+        #Metodo chamado ao fechar a janela#
+        self.cap.release()  # Libera o dispositivo de captura
+        cv2.destroyAllWindows()  # Fecha janelas OpenCV
+        event.accept()  # Aceita o evento de fechamento
 
-if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    window = AntennaTracker()
-    window.show()
-    sys.exit(app.exec_())
+if __name__ == '__main__':
+    # Ponto de entrada principal
+    app = QApplication(sys.argv)  # Cria aplicação Qt
+    window = HSVApp()  # Instancia a janela principal
+    window.show()  # Mostra a janela
+    sys.exit(app.exec_())  # Loop principal e tratamento de saida

@@ -1,145 +1,118 @@
 # -*- coding: utf-8 -*-
-# Declaração de codificação para suportar caracteres especiais
-import sys  # Módulo para funcionalidades do sistema
-import cv2  # OpenCV para processamento de imagem
-import numpy as np  # NumPy para operações numericas
-from PyQt5.QtWidgets import QApplication, QMainWindow  # Componentes basicos do Qt
-from PyQt5.QtCore import QTimer, Qt  # Temporizador e constantes Qt
-from PyQt5.QtGui import QImage, QPixmap  # Classes para manipulação de imagens
-from src.ui.interface import Ui_MainWindow  # Interface gerada pelo Qt Designer
-from src.backend.colorfilter import ColorFilter  # Importa a classe de filtro de cor
+import sys
+import cv2
+import numpy as np
+from PyQt5.QtWidgets import QApplication, QMainWindow, QLabel, QPushButton, QVBoxLayout, QWidget
+from PyQt5.QtCore import Qt, QTimer, pyqtSignal
+from PyQt5.QtGui import QImage, QPixmap
+from src.ui.filtro_hsv import HSVFilterWindow  # Importar a janela do filtro HSV
+from src.backend.colorfilter import ColorFilter
 
-class HSVApp(QMainWindow):
+
+class MainWindow(QMainWindow):
+
+    frame_disponivel = pyqtSignal(np.ndarray)
+
     def __init__(self):
-        super().__init__()  # Inicializa a classe base QMainWindow
+        super().__init__()
+        self.setWindowTitle("Janela Principal")
+        self.setGeometry(100, 100, 800, 600)
         
-        # Configuração da interface do usuario
-        self.ui = Ui_MainWindow()  # Cria instância da interface
-        self.ui.setupUi(self)  # Configura a interface na janela principal
-
-        # Valores padrão para reset
-        self.default_values = {
-            'h_min': 0,
-            'h_max': 179,
-            's_min': 0,
-            's_max': 255,
-            'v_min': 0,
-            'v_max': 255
+        # Valores padrão do filtro HSV
+        self.filtro_hsv = {
+            "h_min": 0, "h_max": 179,
+            "s_min": 0, "s_max": 255,
+            "v_min": 0, "v_max": 255
         }
-
-        # Inicializa a captura de video da webcam (dispositivo 0)
+        
+        # Configurar interface
+        self.central_widget = QWidget()
+        self.setCentralWidget(self.central_widget)
+        self.layout = QVBoxLayout(self.central_widget)
+        
+        # Labels para exibir as imagens
+        self.label_original = QLabel("[Imagem Original]")
+        self.label_original.setAlignment(Qt.AlignCenter)
+        self.layout.addWidget(self.label_original)
+        
+        self.label_filtrada = QLabel("[Imagem Filtrada]")
+        self.label_filtrada.setAlignment(Qt.AlignCenter)
+        self.layout.addWidget(self.label_filtrada)
+        
+        # Botão para abrir o filtro HSV
+        self.btn_abrir_filtro = QPushButton("Abrir Filtro HSV")
+        self.btn_abrir_filtro.clicked.connect(self.abrir_filtro)
+        self.layout.addWidget(self.btn_abrir_filtro)
+        
+        # Captura de vídeo e timer
         self.cap = cv2.VideoCapture(0)
+        self.timer = QTimer()
+        self.timer.timeout.connect(self.atualizar_frame)
+        self.timer.start(30)
+        self.filtro = ColorFilter()
 
-        # Configuração do temporizador para atualização continua
-        self.timer = QTimer()  # Cria um temporizador Qt
-        self.timer.timeout.connect(self.update_frame)  # Conecta ao metodo de atualização
-        self.timer.start(30)  # Intervalo de atualização em ms (~33fps)
+        self.frame_disponivel.connect(self.enviar_frame_para_filtro)
 
-        # Dicionario para acesso facil aos sliders da interface
-        self.sliders = {
-            'h_min': self.ui.slider_h_min,  # Slider de Hue minimo
-            'h_max': self.ui.slider_h_max,  # Slider de Hue maximo
-            's_min': self.ui.slider_s_min,  # Slider de Saturação minimo
-            's_max': self.ui.slider_s_max,  # Slider de Saturação maximo
-            'v_min': self.ui.slider_v_min,  # Slider de Valor (brilho) minimo
-            'v_max': self.ui.slider_v_max   # Slider de Valor (brilho) maximo
+    def atualizar_filtro(self, valores):
+        # Atualiza os valores do filtro HSV
+        self.filtro_hsv = {
+            "h_min": valores["h_min"],
+            "h_max": valores["h_max"],
+            "s_min": valores["s_min"],
+            "s_max": valores["s_max"],
+            "v_min": valores["v_min"],
+            "v_max": valores["v_max"]
         }
+        print("Valores do filtro atualizados:", self.filtro_hsv)
         
-        # Dicionario para acesso facil aos labels de valores
-        self.labels = {
-            'h_min': self.ui.label_h_min,  # Label para H Min
-            'h_max': self.ui.label_h_max,  # Label para H Max
-            's_min': self.ui.label_s_min,  # Label para S Min
-            's_max': self.ui.label_s_max,  # Label para S Max
-            'v_min': self.ui.label_v_min,  # Label para V Min
-            'v_max': self.ui.label_v_max   # Label para V Max
-        }
+    def abrir_filtro(self):
+        self.janela_filtro = HSVFilterWindow(self.filtro_hsv, self)
+        self.janela_filtro.valores_aplicados.connect(self.atualizar_filtro)
+        self.janela_filtro.show()
 
-        # Configura as conexões entre sliders e labels
-        self.connect_sliders()
-        
-        # Conecta o botão de reset
-        self.ui.btn_reset.clicked.connect(self.reset_values)
+    
 
-        self.color_filter = ColorFilter()  # Instancia o filtro de cor 
+    def enviar_frame_para_filtro(self, frame):
+        #Envia o frame para a janela de calibração se estiver aberta
+        if hasattr(self, 'janela_filtro') and self.janela_filtro.isVisible():
+            self.janela_filtro.receber_frame(frame)
 
-    def reset_values(self):
-        #Reseta todos os sliders para os valores padrão#
-        for key, slider in self.sliders.items():
-            slider.setValue(self.default_values[key])
-        
-        # Atualiza os labels manualmente (opcional, pois os valueChanged devem disparar)
-        for key, label in self.labels.items():
-            label.setText(f"{key.split('_')[0].upper()} {key.split('_')[1]}: {self.default_values[key]}")
-
-    def connect_sliders(self):
-        #Conecta cada slider ao seu label correspondente para atualização em tempo real
-        self.ui.slider_h_min.valueChanged.connect(
-            lambda v: self.ui.label_h_min.setText(f"H Min: {v}"))
-        self.ui.slider_h_max.valueChanged.connect(
-            lambda v: self.ui.label_h_max.setText(f"H Max: {v}"))
-        self.ui.slider_s_min.valueChanged.connect(
-            lambda v: self.ui.label_s_min.setText(f"S Min: {v}"))
-        self.ui.slider_s_max.valueChanged.connect(
-            lambda v: self.ui.label_s_max.setText(f"S Max: {v}"))
-        self.ui.slider_v_min.valueChanged.connect(
-            lambda v: self.ui.label_v_min.setText(f"V Min: {v}"))
-        self.ui.slider_v_max.valueChanged.connect(
-            lambda v: self.ui.label_v_max.setText(f"V Max: {v}"))
-
-    def update_frame(self):
-        #Captura e processa cada frame da câmera#
-        # Lê um frame da câmera
+    def atualizar_frame(self):
         ret, frame = self.cap.read()
-        if not ret:  # Se falhar ao capturar o frame
-            return  # Sai da função
-
-        # Converte o frame de BGR (OpenCV) para HSV
+        if not ret: return
+        
         hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+        mask = self.filtro.hsv_filter(
+            hsv,
+            (self.filtro_hsv["h_min"], self.filtro_hsv["h_max"]),
+            (self.filtro_hsv["s_min"], self.filtro_hsv["s_max"]),
+            (self.filtro_hsv["v_min"], self.filtro_hsv["v_max"])
+        )
+        frame_contornos = self.filtro.apply_contours(mask, frame.copy())
+        frame_filtrado = cv2.bitwise_and(frame, frame, mask=mask)
 
-        # Obtem os valores atuais dos sliders
-        h_min = self.sliders['h_min'].value()  # Valor atual do Hue minimo
-        h_max = self.sliders['h_max'].value()  # Valor atual do Hue maximo
-        s_min = self.sliders['s_min'].value()  # Valor atual da Saturação minima
-        s_max = self.sliders['s_max'].value()  # Valor atual da Saturação maxima
-        v_min = self.sliders['v_min'].value()  # Valor atual do Valor minimo
-        v_max = self.sliders['v_max'].value()  # Valor atual do Valor maximo
+        # Enviar frame para a janela de calibração
+        self.frame_disponivel.emit(frame)
 
-        
-        mask = self.color_filter.hsv_filter(hsv, (h_min, h_max), (s_min, s_max), (v_min, v_max))   # Aplica o filtro HSV
-        
-        #Criar botão para essa função
-        frame = self.color_filter.apply_contours(mask, frame)
-        # Aplica a mascara ao frame original
-        result = cv2.bitwise_and(frame, frame, mask=mask)
+        # Exibir na interface principal
+        self.mostrar_imagem(self.label_original, frame_contornos)
+        self.mostrar_imagem(self.label_filtrada, frame_filtrado)
 
-        # Exibe o resultado processado
-        self.show_image(result)
 
-    def show_image(self, img):
-        #Exibe uma imagem OpenCV no QLabel da interface#
-        # Converte de BGR (OpenCV) para RGB (Qt)
+    def mostrar_imagem(self, label, img):
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        
-        # Obtem dimensões da imagem
-        height, width, channel = img.shape
-        step = channel * width  # Calcula bytes por linha
-        
-        # Cria QImage a partir dos dados numpy
-        q_img = QImage(img.data, width, height, step, QImage.Format_RGB888)
-        
-        # Converte para QPixmap e exibe no label
-        self.ui.label_output.setPixmap(QPixmap.fromImage(q_img))
+        h, w, ch = img.shape
+        bytes_per_line = ch * w
+        q_img = QImage(img.data, w, h, bytes_per_line, QImage.Format_RGB888)
+        label.setPixmap(QPixmap.fromImage(q_img))
 
     def closeEvent(self, event):
-        #Metodo chamado ao fechar a janela#
-        self.cap.release()  # Libera o dispositivo de captura
-        cv2.destroyAllWindows()  # Fecha janelas OpenCV
-        event.accept()  # Aceita o evento de fechamento
+        self.cap.release()
+        cv2.destroyAllWindows()
+        event.accept()
 
-if __name__ == '__main__':
-    # Ponto de entrada principal
-    app = QApplication(sys.argv)  # Cria aplicação Qt
-    window = HSVApp()  # Instancia a janela principal
-    window.show()  # Mostra a janela
-    sys.exit(app.exec_())  # Loop principal e tratamento de saida
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    window = MainWindow()
+    window.show()
+    sys.exit(app.exec_())
