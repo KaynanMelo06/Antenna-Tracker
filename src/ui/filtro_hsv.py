@@ -78,9 +78,13 @@ class Ui_MainWindow(object):
         self.pushButton = QtWidgets.QPushButton(self.centralwidget)
         self.pushButton.setObjectName("pushButton")
         self.verticalLayout.addWidget(self.pushButton)
+        self.combo_filtro = QtWidgets.QComboBox(self.centralwidget)
+        self.combo_filtro.addItems(["laranja", "azul"])  # Pode ser dinâmico depois
+        self.verticalLayout.addWidget(self.combo_filtro)
         MainWindow.setCentralWidget(self.centralwidget)
         self.retranslateUi(MainWindow)
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
+
 
     def retranslateUi(self, MainWindow):
         _translate = QtCore.QCoreApplication.translate
@@ -99,13 +103,18 @@ class Ui_MainWindow(object):
 class HSVFilterWindow(QtWidgets.QMainWindow):
     valores_aplicados = pyqtSignal(dict)
     
-    def __init__(self, valores_iniciais, parent=None):
+    def __init__(self, valores_iniciais_dict, parent=None):
         super().__init__(parent)
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
-        self.setWindowTitle("Calibracao HSV - Tempo Real")
-        
-        # Mapeamento dos sliders e labels
+        self.setWindowTitle("Calibracao HSV - Multiplos Filtros")
+
+        self.filtros = valores_iniciais_dict  # dicionário: {"laranja": {...}, "azul": {...}}
+        self.nome_filtro_atual = self.ui.combo_filtro.currentText()
+
+        self.ui.combo_filtro.currentTextChanged.connect(self.trocar_filtro)
+
+        # Inicializa sliders com os valores do primeiro filtro
         self.sliders = {
             "h_min": self.ui.slider_h_min,
             "h_max": self.ui.slider_h_max,
@@ -114,26 +123,20 @@ class HSVFilterWindow(QtWidgets.QMainWindow):
             "v_min": self.ui.slider_v_min,
             "v_max": self.ui.slider_v_max,
         }
-        
-        # Configurar valores iniciais
+
         for key, slider in self.sliders.items():
-            slider.setValue(valores_iniciais[key])
-            self.atualizar_label(key, slider.value())
-            slider.valueChanged.connect(lambda val, k=key: self.atualizar_label(k, val))
-            slider.valueChanged.connect(lambda _: self.processar_imagem())
+            slider.valueChanged.connect(lambda val, k=key: self.atualizar_valor(k, val))
+
+        self.current_frame = None
+        self.carregar_filtro(self.nome_filtro_atual)
         
-        # Configurar botões
         self.ui.pushButton.setText("Aplicar")
         self.ui.pushButton.clicked.connect(self.aplicar)
         self.ui.pushButton_2.clicked.connect(self.reset)
         
-        # Variável para armazenar o último frame
-        self.current_frame = None
-        
-        # Timer para atualização da imagem
         self.timer = QtCore.QTimer()
         self.timer.timeout.connect(self.atualizar_imagem)
-        self.timer.start(30)  # ~30 FPS
+        self.timer.start(60)
     
     def atualizar_label(self, chave, valor):
         label = getattr(self.ui, f"label_{chave}")
@@ -198,3 +201,25 @@ class HSVFilterWindow(QtWidgets.QMainWindow):
         #Atualiza a imagem sempre que houver mudança nos sliders
         if self.current_frame is not None:
             self.processar_imagem()
+
+    def trocar_filtro(self, nome):
+        self.nome_filtro_atual = nome
+        self.carregar_filtro(nome)
+
+    def carregar_filtro(self, nome):
+        valores = self.filtros[nome]
+        for key, val in valores.items():
+            self.sliders[key].blockSignals(True)
+            self.sliders[key].setValue(val)
+            self.sliders[key].blockSignals(False)
+            self.atualizar_label(key, val)
+        self.processar_imagem()
+
+    def atualizar_valor(self, chave, valor):
+        self.filtros[self.nome_filtro_atual][chave] = valor
+        self.atualizar_label(chave, valor)
+        self.processar_imagem()
+
+    def aplicar(self):
+        self.valores_aplicados.emit(self.filtros)
+        self.close()

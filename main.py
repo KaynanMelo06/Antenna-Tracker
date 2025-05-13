@@ -2,6 +2,8 @@
 import sys
 import cv2
 import numpy as np
+from src.backend.control.pid import PID
+from src.backend.comm.serial import Serial
 from PyQt5.QtWidgets import QApplication, QMainWindow, QLabel, QPushButton, QVBoxLayout, QWidget
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal
 from PyQt5.QtGui import QImage, QPixmap
@@ -15,14 +17,24 @@ class MainWindow(QMainWindow):
 
     def __init__(self):
         super().__init__()
+        #self.serial = Serial('COM3')  # Inicializa a comunicação serial
+        self.pid = PID(0, 0)
         self.setWindowTitle("Janela Principal")
         self.setGeometry(100, 100, 800, 600)
+        self.filtro = ColorFilter()
         
         # Valores padrão do filtro HSV
-        self.filtro_hsv = {
-            "h_min": 0, "h_max": 179,
-            "s_min": 0, "s_max": 255,
-            "v_min": 0, "v_max": 255
+        self.filtros_hsv = {
+            "laranja": {
+                "h_min": 10, "h_max": 25,
+                "s_min": 100, "s_max": 255,
+                "v_min": 100, "v_max": 255
+            },
+            "azul": {   
+                "h_min": 100, "h_max": 130,
+                "s_min": 100, "s_max": 255,
+                "v_min": 100, "v_max": 255
+            }
         }
         
         # Configurar interface
@@ -43,30 +55,38 @@ class MainWindow(QMainWindow):
         self.btn_abrir_filtro = QPushButton("Abrir Filtro HSV")
         self.btn_abrir_filtro.clicked.connect(self.abrir_filtro)
         self.layout.addWidget(self.btn_abrir_filtro)
-        
-        # Captura de vídeo e timer
-        self.cap = cv2.VideoCapture(0)
+
+         # Captura de vídeo e timer
+        self.cap = cv2.VideoCapture(0) #0 para webcam e 1 para câmera externa
         self.timer = QTimer()
         self.timer.timeout.connect(self.atualizar_frame)
         self.timer.start(30)
-        self.filtro = ColorFilter()
 
         self.frame_disponivel.connect(self.enviar_frame_para_filtro)
 
+    def run(self):
+        pass
+        
+
     def atualizar_filtro(self, valores):
         # Atualiza os valores do filtro HSV
-        self.filtro_hsv = {
-            "h_min": valores["h_min"],
-            "h_max": valores["h_max"],
-            "s_min": valores["s_min"],
-            "s_max": valores["s_max"],
-            "v_min": valores["v_min"],
-            "v_max": valores["v_max"]
+        self.filtros_hsv = {
+            "laranja": {
+                "h_min": 10, "h_max": 25,
+                "s_min": 100, "s_max": 255,
+                "v_min": 100, "v_max": 255
+            },
+            "azul": {
+                "h_min": 100, "h_max": 130,
+                "s_min": 100, "s_max": 255,
+                "v_min": 100, "v_max": 255
+            }
         }
-        print("Valores do filtro atualizados:", self.filtro_hsv)
+        #print("Valores do filtro atualizados:", self.filtro_hsv)
+        
         
     def abrir_filtro(self):
-        self.janela_filtro = HSVFilterWindow(self.filtro_hsv, self)
+        self.janela_filtro = HSVFilterWindow(self.filtros_hsv, self)
         self.janela_filtro.valores_aplicados.connect(self.atualizar_filtro)
         self.janela_filtro.show()
 
@@ -80,21 +100,23 @@ class MainWindow(QMainWindow):
     def atualizar_frame(self):
         ret, frame = self.cap.read()
         if not ret: return
-        
+
         hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-        mask = self.filtro.hsv_filter(
-            hsv,
-            (self.filtro_hsv["h_min"], self.filtro_hsv["h_max"]),
-            (self.filtro_hsv["s_min"], self.filtro_hsv["s_max"]),
-            (self.filtro_hsv["v_min"], self.filtro_hsv["v_max"])
-        )
-        frame_contornos = self.filtro.apply_contours(mask, frame.copy())
-        frame_filtrado = cv2.bitwise_and(frame, frame, mask=mask)
+        mascara_total = np.zeros(hsv.shape[:2], dtype=np.uint8)
 
-        # Enviar frame para a janela de calibração
+        for nome, valores in self.filtros_hsv.items():
+            mask = self.filtro.hsv_filter(
+                hsv,
+                (valores["h_min"], valores["h_max"]),
+                (valores["s_min"], valores["s_max"]),
+                (valores["v_min"], valores["v_max"])
+            )
+            mascara_total = cv2.bitwise_or(mascara_total, mask)
+
+        frame_contornos, cx, cy = self.filtro.apply_contours(mascara_total, frame.copy())
+        frame_filtrado = cv2.bitwise_and(frame, frame, mask=mascara_total)
+
         self.frame_disponivel.emit(frame)
-
-        # Exibir na interface principal
         self.mostrar_imagem(self.label_original, frame_contornos)
         self.mostrar_imagem(self.label_filtrada, frame_filtrado)
 

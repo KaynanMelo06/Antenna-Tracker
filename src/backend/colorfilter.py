@@ -32,5 +32,5 @@ class ColorFilter:
                     cx = int(M["m10"] / M["m00"])
                     cy = int(M["m01"] / M["m00"])
                     cv2.circle(frame, (cx, cy), 5, (255, 0, 0), -1)  # marca o centro (azul)
-        return frame
+        return frame, cx, cy
 
