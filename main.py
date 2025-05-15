@@ -2,6 +2,7 @@
 import sys
 import cv2
 import numpy as np
+import math
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QLabel, QPushButton,
     QVBoxLayout, QSizePolicy, QComboBox
@@ -19,14 +20,15 @@ class UpComboBox(QComboBox):
         popup = self.view().window()
         # mapa o canto inferior esquerdo do combobox
         global_pos = self.mapToGlobal(self.rect().bottomLeft())
-        
+        popup.move(global_pos)
+
 class MainWindow(QMainWindow):
     # Signal para envio de frames à janela de calibração
     frame_available = pyqtSignal(np.ndarray)
 
     def __init__(self):
         super().__init__()
-        #self.serial = Serial('COM3')  # Inicializa a comunica��o serial
+        #self.serial = Serial('COM3')  # Inicializa a comunicação serial
         self.pid = PID(0, 0)
         self.setWindowTitle("Antenna Tracker")
         self.resize(1024, 768)
@@ -107,6 +109,41 @@ class MainWindow(QMainWindow):
         if self.calibration_window and self.calibration_window.isVisible():
             self.calibration_window.receber_frame(frame)
 
+    def encontrar_centroid(self, contorno):
+        M = cv2.moments(contorno)
+        if M["m00"] == 0:
+            return None
+        return (int(M["m10"]/M["m00"]), int(M["m01"]/M["m00"]))
+
+    def calcula_vetor_angulo(self, frame):
+        hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+        centroids = {}
+        # percorre cada cor de interesse (rosa, verde, amarelo)
+        for cor in ["rosa", "verde", "amarelo"]:
+            f = self.filters_hsv[cor]
+            lower = np.array([f["h_min"], f["s_min"], f["v_min"]])
+            upper = np.array([f["h_max"], f["s_max"], f["v_max"]])
+            mask = cv2.inRange(hsv, lower, upper)
+            mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, np.ones((5,5), np.uint8))
+            conts, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            if not conts:
+                continue
+            c = max(conts, key=cv2.contourArea)
+            cent = self.encontrar_centroid(c)
+            if cent:
+                centroids[cor] = cent
+
+        if all(k in centroids for k in ("amarelo","rosa","verde")):
+            cx_a, cy_a = centroids["amarelo"]
+            cx_r, cy_r = centroids["rosa"]
+            cx_v, cy_v = centroids["verde"]
+            # ponto médio das duas frentes
+            mx, my = (cx_r + cx_v)//2, (cy_r + cy_v)//2
+            vx, vy = mx - cx_a, my - cy_a
+            angulo = math.degrees(math.atan2(vy, vx))
+            return {"vetor": (vx, vy), "angulo": angulo, "centros": centroids}
+        return None
+
     def _update_frame(self):
         # Captura e processa o frame atual
         ret, frame = self.cap.read()
@@ -136,6 +173,18 @@ class MainWindow(QMainWindow):
 
         contoured = self.filter_proc.apply_contours(mask_total, frame.copy())
         filtered = cv2.bitwise_and(frame, frame, mask=mask_total)
+
+        # calcula e desenha vetor de ângulo
+        res = self.calcula_vetor_angulo(frame)
+        if res:
+            vx, vy = res["vetor"]
+            ang = res["angulo"]
+            cx_a, cy_a = res["centros"]["amarelo"]
+            pt0 = (cx_a, cy_a)
+            pt1 = (cx_a + int(vx*1.5), cy_a + int(vy*1.5))
+            cv2.arrowedLine(contoured, pt0, pt1, (255,0,0), 2, tipLength=0.2)
+            cv2.putText(contoured, f"{ang:.1f}°", (pt1[0]+5, pt1[1]-5),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255,255,255), 2)
 
         self.frame_available.emit(frame)
         self._display(self.label_original, contoured)

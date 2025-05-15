@@ -5,6 +5,7 @@ from PyQt5.QtGui import QImage, QPixmap
 import cv2
 import numpy as np
 
+
 class Ui_HSVFilterWindow(object):
     def setupUi(self, MainWindow):
         MainWindow.setObjectName("HSVFilterWindow")
