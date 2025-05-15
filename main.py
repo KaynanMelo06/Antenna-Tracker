@@ -13,6 +13,13 @@ from src.backend.colorfilter import ColorFilter
 from src.backend.control.pid import PID
 from src.backend.comm.serial import Serial
 
+class UpComboBox(QComboBox):
+    def showPopup(self):
+        super().showPopup()
+        popup = self.view().window()
+        # mapa o canto inferior esquerdo do combobox
+        global_pos = self.mapToGlobal(self.rect().bottomLeft())
+        
 class MainWindow(QMainWindow):
     # Signal para envio de frames à janela de calibração
     frame_available = pyqtSignal(np.ndarray)
