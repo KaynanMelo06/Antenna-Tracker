@@ -9,6 +9,7 @@ from PyQt5.QtCore import Qt, QTimer, pyqtSignal
 from PyQt5.QtGui import QImage, QPixmap
 from src.ui.filtro_hsv import HSVFilterWindow  # Importar a janela do filtro HSV
 from src.backend.colorfilter import ColorFilter
+from PyQt5.QtWidgets import QSizePolicy
 
 
 class MainWindow(QMainWindow):
@@ -17,13 +18,15 @@ class MainWindow(QMainWindow):
 
     def __init__(self):
         super().__init__()
-        #self.serial = Serial('COM3')  # Inicializa a comunicação serial
+        #self.serial = Serial('COM3')  # Inicializa a comunicaï¿½ï¿½o serial
         self.pid = PID(0, 0)
         self.setWindowTitle("Janela Principal")
-        self.setGeometry(100, 100, 800, 600)
+        self.resize(1024, 768)
+        self.setMinimumSize(800, 600)
+        #self.setGeometry(100, 100, 500, 300)
         self.filtro = ColorFilter()
         
-        # Valores padrão do filtro HSV
+        # Valores padrï¿½o do filtro HSV
         self.filtros_hsv = {
             "laranja": {
                 "h_min": 10, "h_max": 25,
@@ -40,24 +43,27 @@ class MainWindow(QMainWindow):
         # Configurar interface
         self.central_widget = QWidget()
         self.setCentralWidget(self.central_widget)
+        self.central_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.layout = QVBoxLayout(self.central_widget)
         
         # Labels para exibir as imagens
         self.label_original = QLabel("[Imagem Original]")
         self.label_original.setAlignment(Qt.AlignCenter)
+        self.label_original.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.layout.addWidget(self.label_original)
         
         self.label_filtrada = QLabel("[Imagem Filtrada]")
         self.label_filtrada.setAlignment(Qt.AlignCenter)
+        self.label_filtrada.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.layout.addWidget(self.label_filtrada)
         
-        # Botão para abrir o filtro HSV
+        # Botï¿½o para abrir o filtro HSV
         self.btn_abrir_filtro = QPushButton("Abrir Filtro HSV")
         self.btn_abrir_filtro.clicked.connect(self.abrir_filtro)
         self.layout.addWidget(self.btn_abrir_filtro)
 
-         # Captura de vídeo e timer
-        self.cap = cv2.VideoCapture(0) #0 para webcam e 1 para câmera externa
+         # Captura de vï¿½deo e timer
+        self.cap = cv2.VideoCapture(0) #0 para webcam e 1 para cï¿½mera externa
         self.timer = QTimer()
         self.timer.timeout.connect(self.atualizar_frame)
         self.timer.start(30)
@@ -72,9 +78,9 @@ class MainWindow(QMainWindow):
         # Atualiza os valores do filtro HSV
         self.filtros_hsv = {
             "laranja": {
-                "h_min": 10, "h_max": 25,
-                "s_min": 100, "s_max": 255,
-                "v_min": 100, "v_max": 255
+                (valores["h_min"], valores["h_max"]),
+                (valores["s_min"], valores["s_max"]),
+                (valores["v_min"], valores["v_max"])
             },
             "azul": {
                 "h_min": 100, "h_max": 130,
@@ -93,7 +99,7 @@ class MainWindow(QMainWindow):
     
 
     def enviar_frame_para_filtro(self, frame):
-        #Envia o frame para a janela de calibração se estiver aberta
+        #Envia o frame para a janela de calibraï¿½ï¿½o se estiver aberta
         if hasattr(self, 'janela_filtro') and self.janela_filtro.isVisible():
             self.janela_filtro.receber_frame(frame)
 
@@ -112,8 +118,10 @@ class MainWindow(QMainWindow):
                 (valores["v_min"], valores["v_max"])
             )
             mascara_total = cv2.bitwise_or(mascara_total, mask)
-
-        frame_contornos, cx, cy = self.filtro.apply_contours(mascara_total, frame.copy())
+            
+        #frame_contornos, cx, cy = self.filtro.apply_contours(mascara_total, frame.copy())
+        #linha 35 colorfilter.py
+        frame_contornos = self.filtro.apply_contours(mascara_total, frame.copy())
         frame_filtrado = cv2.bitwise_and(frame, frame, mask=mascara_total)
 
         self.frame_disponivel.emit(frame)
@@ -127,6 +135,10 @@ class MainWindow(QMainWindow):
         bytes_per_line = ch * w
         q_img = QImage(img.data, w, h, bytes_per_line, QImage.Format_RGB888)
         label.setPixmap(QPixmap.fromImage(q_img))
+        
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key_Escape:
+            self.close()  # Ou self.showNormal() para voltar ao tamanho original
 
     def closeEvent(self, event):
         self.cap.release()
@@ -136,5 +148,6 @@ class MainWindow(QMainWindow):
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = MainWindow()
+    #window.showFullScreen()  # <- Modo tela cheia
     window.show()
     sys.exit(app.exec_())

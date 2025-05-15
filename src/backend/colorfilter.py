@@ -3,7 +3,7 @@ import cv2
 
 class ColorFilter:
     def __init__(self):
-        self.BLOB_AREA_THRESHOLD = 100  # Limite de área para considerar um blob
+        self.BLOB_AREA_THRESHOLD = 100  # Limite de ï¿½rea para considerar um blob
 
     def hsv_filter(self, hsv_image, hue_range, saturation_range, value_range):
         # Define os limites inferior e superior para filtro HSV
@@ -22,9 +22,9 @@ class ColorFilter:
         for contour in contours:
             area = cv2.contourArea(contour)
             if area > self.BLOB_AREA_THRESHOLD:
-                # Desenha o retângulo que envolve o objeto
+                # Desenha o retï¿½ngulo que envolve o objeto
                 x, y, w, h = cv2.boundingRect(contour)
-                cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 255, 0), 5)  # desenha o retângulo (verde)
+                cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 255, 0), 5)  # desenha o retï¿½ngulo (verde)
 
                 # Desenha o centro do objeto
                 M = cv2.moments(contour)
@@ -32,5 +32,5 @@ class ColorFilter:
                     cx = int(M["m10"] / M["m00"])
                     cy = int(M["m01"] / M["m00"])
                     cv2.circle(frame, (cx, cy), 5, (255, 0, 0), -1)  # marca o centro (azul)
-        return frame, cx, cy
+        return frame #, cx, cy linha 118 main.py
 

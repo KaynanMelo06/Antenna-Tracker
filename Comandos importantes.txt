@@ -1,6 +1,9 @@
 #Comando para inicializar o ambiente virtual PowerShell
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass # PowerShell
-antena/scripts/activate  # Ativa o ambiente virtual
+    Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+#comando para criar o ambiente virtual
+    python3 -m venv antena
+# Ativa o ambiente virtual
+    source antena/bin/activate
 
 #Comando para transformar .ui em .py
 pyuic5 interface.ui -o interface.py # Exemplo da interface.ui
