@@ -7,3 +7,12 @@
 
 #Comando para transformar .ui em .py
 pyuic5 interface.ui -o interface.py # Exemplo da interface.ui
+
+
+<widget class="QComboBox" name="combo_filtro">
+ <item><property name="text"><string>laranja</string></property></item>
+ <item><property name="text"><string>azul</string></property></item>
+ <item><property name="text"><string>verde</string></property></item>
+ <item><property name="text"><string>rosa</string></property></item>
+ <item><property name="text"><string>amarelo</string></property></item>
+</widget>

@@ -1,25 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
- <class>MainWindow</class>
- <widget class="QMainWindow" name="MainWindow">
-  <property name="geometry">
-   <rect>
-    <x>0</x>
-    <y>0</y>
-    <width>600</width>
-    <height>400</height>
-   </rect>
-  </property>
+ <class>HSVFilterWindow</class>
+ <widget class="QMainWindow" name="HSVFilterWindow">
   <property name="windowTitle">
-   <string>Controles HSV</string>
+   <string>Calibração HSV — Múltiplos Filtros</string>
   </property>
   <widget class="QWidget" name="centralwidget">
    <layout class="QVBoxLayout" name="verticalLayout">
     <item>
      <widget class="QLabel" name="label_output">
-      <property name="text">
-       <string>[Imagem Aqui]</string>
-      </property>
+      <property name="text"><string>[Imagem Aqui]</string></property>
       <property name="alignment">
        <set>Qt::AlignmentFlag::AlignCenter</set>
       </property>
@@ -27,136 +17,41 @@
     </item>
     <item>
      <layout class="QGridLayout" name="gridLayout">
-      <item row="4" column="2">
-       <widget class="QSlider" name="slider_v_min">
-        <property name="maximum">
-         <number>255</number>
-        </property>
-        <property name="orientation">
-         <enum>Qt::Orientation::Horizontal</enum>
-        </property>
-       </widget>
-      </item>
-      <item row="3" column="2">
-       <widget class="QSlider" name="slider_s_max">
-        <property name="maximum">
-         <number>255</number>
-        </property>
-        <property name="value">
-         <number>255</number>
-        </property>
-        <property name="orientation">
-         <enum>Qt::Orientation::Horizontal</enum>
-        </property>
-       </widget>
-      </item>
-      <item row="6" column="2">
-       <widget class="QSlider" name="slider_v_max">
-        <property name="maximum">
-         <number>255</number>
-        </property>
-        <property name="value">
-         <number>255</number>
-        </property>
-        <property name="orientation">
-         <enum>Qt::Orientation::Horizontal</enum>
-        </property>
-       </widget>
-      </item>
-      <item row="1" column="2">
-       <widget class="QSlider" name="slider_h_max">
-        <property name="maximum">
-         <number>179</number>
-        </property>
-        <property name="value">
-         <number>179</number>
-        </property>
-        <property name="orientation">
-         <enum>Qt::Orientation::Horizontal</enum>
-        </property>
-       </widget>
-      </item>
-      <item row="2" column="2">
-       <widget class="QSlider" name="slider_s_min">
-        <property name="maximum">
-         <number>255</number>
-        </property>
-        <property name="orientation">
-         <enum>Qt::Orientation::Horizontal</enum>
-        </property>
-       </widget>
-      </item>
-      <item row="0" column="2">
-       <widget class="QSlider" name="slider_h_min">
-        <property name="maximum">
-         <number>179</number>
-        </property>
-        <property name="orientation">
-         <enum>Qt::Orientation::Horizontal</enum>
-        </property>
-       </widget>
-      </item>
-      <item row="6" column="0">
-       <widget class="QLabel" name="label_v_max">
-        <property name="text">
-         <string>V Max: 255</string>
-        </property>
-       </widget>
-      </item>
-      <item row="2" column="0">
-       <widget class="QLabel" name="label_s_min">
-        <property name="text">
-         <string>S Min: 0</string>
-        </property>
-       </widget>
-      </item>
-      <item row="3" column="0">
-       <widget class="QLabel" name="label_s_max">
-        <property name="text">
-         <string>S Max: 255</string>
-        </property>
-       </widget>
-      </item>
-      <item row="4" column="0">
-       <widget class="QLabel" name="label_v_min">
-        <property name="text">
-         <string>V Min: 0</string>
-        </property>
-       </widget>
-      </item>
-      <item row="0" column="0">
-       <widget class="QLabel" name="label_h_min">
-        <property name="text">
-         <string>H Min: 0</string>
-        </property>
-       </widget>
-      </item>
-      <item row="1" column="0">
-       <widget class="QLabel" name="label_h_max">
-        <property name="text">
-         <string>H Max: 179</string>
-        </property>
-       </widget>
-      </item>
-      <item row="7" column="2">
-       <widget class="QPushButton" name="pushButton_2">
-        <property name="text">
-         <string>Reset</string>
-        </property>
-       </widget>
-      </item>
+      <!-- H Min -->
+      <item row="0" column="0"><widget class="QLabel" name="label_h_min"><property name="text"><string>H Min: 0</string></property></widget></item>
+      <item row="0" column="1"><widget class="QSlider" name="slider_h_min"><property name="orientation"><enum>Qt::Orientation::Horizontal</enum></property><property name="maximum"><number>179</number></property></widget></item>
+      <!-- H Max -->
+      <item row="1" column="0"><widget class="QLabel" name="label_h_max"><property name="text"><string>H Max: 179</string></property></widget></item>
+      <item row="1" column="1"><widget class="QSlider" name="slider_h_max"><property name="orientation"><enum>Qt::Orientation::Horizontal</enum></property><property name="maximum"><number>179</number></property><property name="value"><number>179</number></property></widget></item>
+      <!-- S Min -->
+      <item row="2" column="0"><widget class="QLabel" name="label_s_min"><property name="text"><string>S Min: 0</string></property></widget></item>
+      <item row="2" column="1"><widget class="QSlider" name="slider_s_min"><property name="orientation"><enum>Qt::Orientation::Horizontal</enum></property><property name="maximum"><number>255</number></property></widget></item>
+      <!-- S Max -->
+      <item row="3" column="0"><widget class="QLabel" name="label_s_max"><property name="text"><string>S Max: 255</string></property></widget></item>
+      <item row="3" column="1"><widget class="QSlider" name="slider_s_max"><property name="orientation"><enum>Qt::Orientation::Horizontal</enum></property><property name="maximum"><number>255</number></property><property name="value"><number>255</number></property></widget></item>
+      <!-- V Min -->
+      <item row="4" column="0"><widget class="QLabel" name="label_v_min"><property name="text"><string>V Min: 0</string></property></widget></item>
+      <item row="4" column="1"><widget class="QSlider" name="slider_v_min"><property name="orientation"><enum>Qt::Orientation::Horizontal</enum></property><property name="maximum"><number>255</number></property></widget></item>
+      <!-- V Max -->
+      <item row="5" column="0"><widget class="QLabel" name="label_v_max"><property name="text"><string>V Max: 255</string></property></widget></item>
+      <item row="5" column="1"><widget class="QSlider" name="slider_v_max"><property name="orientation"><enum>Qt::Orientation::Horizontal</enum></property><property name="maximum"><number>255</number></property><property name="value"><number>255</number></property></widget></item>
+      <!-- Botões -->
+      <item row="6" column="0"><widget class="QPushButton" name="btn_reset"><property name="text"><string>Reset</string></property></widget></item>
+      <item row="6" column="1"><widget class="QPushButton" name="btn_aplicar"><property name="text"><string>Aplicar</string></property></widget></item>
      </layout>
     </item>
+    <!-- Combo de seleção -->
     <item>
-     <widget class="QPushButton" name="pushButton">
-      <property name="text">
-       <string>PushButton</string>
-      </property>
+     <widget class="QComboBox" name="combo_filtro">
+      <item><property name="text"><string>laranja</string></property></item>
+      <item><property name="text"><string>azul</string></property></item>
+      <item><property name="text"><string>verde</string></property></item>
+      <item><property name="text"><string>rosa</string></property></item>
+      <item><property name="text"><string>amarelo</string></property></item>
      </widget>
     </item>
    </layout>
   </widget>
- </widget>
  <resources/>
  <connections/>
 </ui>
