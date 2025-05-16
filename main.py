@@ -5,22 +5,24 @@ import numpy as np
 import math
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QLabel, QPushButton,
-    QVBoxLayout, QSizePolicy, QComboBox
+    QVBoxLayout, QSizePolicy, QComboBox, QShortcut
 )
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal
-from PyQt5.QtGui import QImage, QPixmap
+from PyQt5.QtGui import QImage, QPixmap, QKeySequence
 from src.ui.filtro_hsv import HSVFilterWindow
 from src.backend.colorfilter import ColorFilter
 from src.backend.control.pid import PID
-from src.backend.comm.serial import Serial
+#from src.backend.comm.serial import Serial
 
 class UpComboBox(QComboBox):
     def showPopup(self):
-        super().showPopup()
+        super().showPopup()  
         popup = self.view().window()
-        # mapa o canto inferior esquerdo do combobox
-        global_pos = self.mapToGlobal(self.rect().bottomLeft())
-        popup.move(global_pos)
+        geo = popup.geometry()
+        # ponto superior esquerdo do combo no global
+        top_left = self.mapToGlobal(self.rect().topLeft())
+        # reposiciona o popup para abrir pra cima
+        popup.move(top_left.x(), top_left.y() - geo.height())
 
 class MainWindow(QMainWindow):
     # Signal para envio de frames à janela de calibração
@@ -37,6 +39,10 @@ class MainWindow(QMainWindow):
         self._setup_ui()
         self._setup_camera()
         self.calibration_window = None
+        self.showFullScreen()
+        #Keybinds para fechar o FullScreen
+        esc = QShortcut(QKeySequence(Qt.Key_Escape), self)
+        esc.activated.connect(self.close)
 
     def _setup_filters(self):
         # Inicializa os ranges HSV para cada cor
@@ -68,7 +74,7 @@ class MainWindow(QMainWindow):
         self.label_filtered.setAlignment(Qt.AlignCenter)
         self.label_filtered.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         layout.addWidget(self.label_filtered)
-
+        
         # ComboBox de seleção de filtro
         self.combo_filter = UpComboBox()
         for color in list(self.filters_hsv.keys()) + ["todos"]:
@@ -217,5 +223,5 @@ class MainWindow(QMainWindow):
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     win = MainWindow()
-    win.show()
+    win.show()     #win.showFullScreen() # abre em tela cheia  | #win.show() # abre em modo janela
     sys.exit(app.exec_())
