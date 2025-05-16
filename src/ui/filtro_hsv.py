@@ -78,6 +78,9 @@ class HSVFilterWindow(QtWidgets.QMainWindow):
     def load_filter(self, filter_name):
         # Load values into sliders and labels
         settings = self.filtros[filter_name]
+        if filter_name not in self.filtros:
+            return
+        settings = self.filtros[filter_name]
         for name, (lbl, sld) in self.ui.sliders.items():
             sld.blockSignals(True)
             sld.setValue(settings[name])
@@ -127,3 +130,9 @@ class HSVFilterWindow(QtWidgets.QMainWindow):
             Qt.KeepAspectRatio
         )
         self.ui.label_output.setPixmap(pix)
+    
+    def closeEvent(self, event):
+        super().closeEvent(event)
+        # avisa o parent de que não há mais janela de calibração aberta
+        if hasattr(self.parent(), 'calibration_window'):
+            self.parent().calibration_window = None

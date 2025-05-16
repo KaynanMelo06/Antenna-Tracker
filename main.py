@@ -48,7 +48,7 @@ class MainWindow(QMainWindow):
             "amarelo": {"h_min": 25, "h_max": 35,  "s_min": 100, "s_max": 255, "v_min": 100, "v_max": 255},
         }
         self.pid = PID(0, 0)
-        # self.serial = Serial('COM3')
+        # self.serial = Serial('COM3')  linux: '/dev/ttyUSB0'
         self.filter_proc = ColorFilter()
 
     def _setup_ui(self):
@@ -83,7 +83,7 @@ class MainWindow(QMainWindow):
 
     def _setup_camera(self):
         # Inicializa captura de vídeo e timer
-        self.cap = cv2.VideoCapture(0)
+        self.cap = cv2.VideoCapture(0) # ('/dev/video2') para camera externa e (0) para webcam 
         self.timer = QTimer(self)
         self.timer.timeout.connect(self._update_frame)
         self.timer.start(30)
@@ -97,8 +97,18 @@ class MainWindow(QMainWindow):
         else:
             self.calibration_window.filtros = self.filters_hsv
             current = self.calibration_window.ui.combo_filtro.currentText()
-            self.calibration_window.carregar_filtro(current)
+            self.calibration_window.load_filter(current)
         self.calibration_window.show()
+        # (Re)cria a janela de calibração se necessário
+        selected = self.combo_filter.currentText()
+        if self.calibration_window is None or not self.calibration_window.isVisible():
+            self.calibration_window = HSVFilterWindow(self.filters_hsv, self)
+            self.calibration_window.valores_aplicados.connect(self._update_filters)
+        # Atualiza o combo e carrega os sliders para o filtro selecionado
+        self.calibration_window.ui.combo_filtro.setCurrentText(selected)
+        if selected in self.filters_hsv:
+            self.calibration_window.load_filter(selected)
+
 
     def _update_filters(self, new_filters):
         # Atualiza os ranges HSV com os valores calibrados
@@ -118,7 +128,7 @@ class MainWindow(QMainWindow):
     def calcula_vetor_angulo(self, frame):
         hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
         centroids = {}
-        # percorre cada cor de interesse (rosa, verde, amarelo)
+        # percorre cada cor de interesse (rosa, verde, amarelo) *MUDE AS TAGS/ID's MANUALMENTE AQUI* 
         for cor in ["rosa", "verde", "amarelo"]:
             f = self.filters_hsv[cor]
             lower = np.array([f["h_min"], f["s_min"], f["v_min"]])
