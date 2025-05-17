@@ -13,6 +13,8 @@ from src.ui.filtro_hsv import HSVFilterWindow
 from src.backend.colorfilter import ColorFilter
 from src.backend.control.pid import PID
 #from src.backend.comm.serial import Serial
+from src.ui.view.calibratecamera import CameraCalibrator
+
 
 class UpComboBox(QComboBox):
     def showPopup(self):
@@ -89,10 +91,20 @@ class MainWindow(QMainWindow):
 
     def _setup_camera(self):
         # Inicializa captura de vídeo e timer
-        self.cap = cv2.VideoCapture(0) # ('/dev/video2') para camera externa e (0) para webcam 
+        self.cap = cv2.VideoCapture('/dev/video2') # ('/dev/video2') para camera externa e (0) para webcam
+        # 1) Parâmetros de calibração (substitua pelos seus valores)
+        fx, fy = 632.136, 632.392
+        cx, cy = 326.322, 275.210
+        # k1, k2, p1, p2, k3
+        dist_coeffs = [-0.387946, 0.231226, -0.002024, -0.000541306, -0.0972837]
+        # Resolução dos frames
+        image_size = (640, 480)
+        # 2) Inicializa o calibrador
+        self.calibrator = CameraCalibrator(fx, fy, cx, cy, dist_coeffs, image_size)
+        
         self.timer = QTimer(self)
         self.timer.timeout.connect(self._update_frame)
-        self.timer.start(30)
+        self.timer.start(15) #(15)quanto menor mais fluido a imagem (fps)
         self.frame_available.connect(self._send_frame_to_calibrator)
 
     def open_calibration(self):
@@ -114,7 +126,6 @@ class MainWindow(QMainWindow):
         self.calibration_window.ui.combo_filtro.setCurrentText(selected)
         if selected in self.filters_hsv:
             self.calibration_window.load_filter(selected)
-
 
     def _update_filters(self, new_filters):
         # Atualiza os ranges HSV com os valores calibrados
@@ -165,6 +176,11 @@ class MainWindow(QMainWindow):
         ret, frame = self.cap.read()
         if not ret:
             return
+        
+        # Remove distorção usando CameraCalibrator
+        frame = self.calibrator.undistort(frame)
+
+        # Processamento HSV e desenho de vetores
         hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
         mask_total = np.zeros(hsv.shape[:2], dtype=np.uint8)
 
@@ -191,6 +207,7 @@ class MainWindow(QMainWindow):
         filtered = cv2.bitwise_and(frame, frame, mask=mask_total)
 
         # calcula e desenha vetor de ângulo
+
         res = self.calcula_vetor_angulo(frame)
         if res:
             vx, vy = res["vetor"]
@@ -202,12 +219,13 @@ class MainWindow(QMainWindow):
             cv2.putText(contoured, f"{ang:.1f}°", (pt1[0]+5, pt1[1]-5),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255,255,255), 2)
 
+        # Exibe frames
         self.frame_available.emit(frame)
         self._display(self.label_original, contoured)
         self._display(self.label_filtered, filtered)
 
     def _display(self, label, img):
-        # Converte e exibe imagem no QLabel
+        # Converte imagem BGR para QPixmap para exibição no Qt
         rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         h, w, ch = rgb.shape
         qimg = QImage(rgb.data, w, h, ch*w, QImage.Format_RGB888)
@@ -215,7 +233,7 @@ class MainWindow(QMainWindow):
         label.setPixmap(pix)
 
     def closeEvent(self, event):
-        # Libera recursos ao fechar
+        # Garante liberação de recursos ao fechar
         self.cap.release()
         cv2.destroyAllWindows()
         super().closeEvent(event)
