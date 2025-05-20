@@ -206,7 +206,6 @@ class MainWindow(QMainWindow):
                 (vals["s_min"], vals["s_max"]),
                 (vals["v_min"], vals["v_max"])
             )
-
         contoured = self.filter_proc.apply_contours(mask_total, undistorted.copy())
         filtered = cv2.bitwise_and(undistorted, undistorted, mask=mask_total)
 
@@ -222,6 +221,35 @@ class MainWindow(QMainWindow):
             cv2.arrowedLine(contoured, pt0, pt1, (255,0,0), 2, tipLength=0.2)
             cv2.putText(contoured, f"{ang:.1f}°", (pt1[0]+5, pt1[1]-5),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255,255,255), 2)
+            
+        # --- VETOR DE BUSCA PARA OBJETO LARANJA (a partir do meio das tags rosa e verde) ---
+        # Máscara da cor laranja
+        vals_o = self.filters_hsv["laranja"]
+        mask_o = self.filter_proc.hsv_filter(
+            hsv,
+            (vals_o["h_min"], vals_o["h_max"]),
+            (vals_o["s_min"], vals_o["s_max"]),
+            (vals_o["v_min"], vals_o["v_max"])
+        )
+        contours_o, _ = cv2.findContours(mask_o, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        # Desenha vetor somente se encontrou laranja e já há centros de rosa/verde
+        if contours_o and res and "rosa" in res["centros"] and "verde" in res["centros"]:
+            # centróide da laranja
+            c = max(contours_o, key=cv2.contourArea)
+            M = cv2.moments(c)
+            if M["m00"] != 0:
+                cx_o = int(M["m10"] / M["m00"])
+                cy_o = int(M["m01"] / M["m00"])
+                # ponto médio entre as tags rosa e verde
+                cx_r, cy_r = res["centros"]["rosa"]
+                cx_v, cy_v = res["centros"]["verde"]
+                mx, my = (cx_r + cx_v)//2, (cy_r + cy_v)//2
+                # desenha seta do meio das tags até o objeto laranja
+                cv2.arrowedLine(contoured, (mx, my), (cx_o, cy_o), (0,165,255), 2, tipLength=0.2)
+                # ângulo em graus
+                ang_o = math.degrees(math.atan2(cy_o - my, cx_o - mx))
+                cv2.putText(contoured, f"{ang_o:.1f}°", (cx_o + 5, cy_o - 5),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255,255,255), 2)
 
         # Exibe frames
         self.frame_available.emit(undistorted)
