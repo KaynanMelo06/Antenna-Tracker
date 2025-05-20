@@ -92,19 +92,23 @@ class MainWindow(QMainWindow):
     def _setup_camera(self):
         # Inicializa captura de vídeo e timer
         self.cap = cv2.VideoCapture('/dev/video2') # ('/dev/video2') para camera externa e (0) para webcam
+        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+        desired_w = 1280
+        desired_h = 720
         # 1) Parâmetros de calibração (substitua pelos seus valores)
-        fx, fy = 632.136, 632.392
-        cx, cy = 326.322, 275.210
+        fx, fy = 1261.5, 1252.74
+        cx, cy = 648.357, 413.334
         # k1, k2, p1, p2, k3
-        dist_coeffs = [-0.387946, 0.231226, -0.002024, -0.000541306, -0.0972837]
+        dist_coeffs = [-0.674575, 0.290729, -0.0169976, -0.000485822, 0.526821]
         # Resolução dos frames
-        image_size = (640, 480)
+        image_size = (desired_w, desired_h)
         # 2) Inicializa o calibrador
         self.calibrator = CameraCalibrator(fx, fy, cx, cy, dist_coeffs, image_size)
         
         self.timer = QTimer(self)
         self.timer.timeout.connect(self._update_frame)
-        self.timer.start(15) #(15)quanto menor mais fluido a imagem (fps)
+        self.timer.start(1) #(15)quanto menor mais fluido a imagem (fps)
         self.frame_available.connect(self._send_frame_to_calibrator)
 
     def open_calibration(self):
@@ -178,10 +182,10 @@ class MainWindow(QMainWindow):
             return
         
         # Remove distorção usando CameraCalibrator
-        frame = self.calibrator.undistort(frame)
+        undistorted = self.calibrator.undistort(frame)
 
         # Processamento HSV e desenho de vetores
-        hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+        hsv = cv2.cvtColor(undistorted, cv2.COLOR_BGR2HSV)
         mask_total = np.zeros(hsv.shape[:2], dtype=np.uint8)
 
         selected = self.combo_filter.currentText()
@@ -203,12 +207,12 @@ class MainWindow(QMainWindow):
                 (vals["v_min"], vals["v_max"])
             )
 
-        contoured = self.filter_proc.apply_contours(mask_total, frame.copy())
-        filtered = cv2.bitwise_and(frame, frame, mask=mask_total)
+        contoured = self.filter_proc.apply_contours(mask_total, undistorted.copy())
+        filtered = cv2.bitwise_and(undistorted, undistorted, mask=mask_total)
 
         # calcula e desenha vetor de ângulo
 
-        res = self.calcula_vetor_angulo(frame)
+        res = self.calcula_vetor_angulo(undistorted)
         if res:
             vx, vy = res["vetor"]
             ang = res["angulo"]
@@ -220,7 +224,7 @@ class MainWindow(QMainWindow):
                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255,255,255), 2)
 
         # Exibe frames
-        self.frame_available.emit(frame)
+        self.frame_available.emit(undistorted)
         self._display(self.label_original, contoured)
         self._display(self.label_filtered, filtered)
 

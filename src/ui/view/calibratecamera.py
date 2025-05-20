@@ -35,20 +35,23 @@ class CameraCalibrator:
             self.intrinsic, self.dist_coeffs,
             (w, h), 1, (w, h)
         )
+        
+        R = np.eye(3, dtype=np.float32)
+        
         # Mapas de remapeamento
-        self.map1, self.map2 = cv2.initUndistortRectifyMap(
-            self.intrinsic, self.dist_coeffs, None,
-            self.new_cam_mtx, (w, h), cv2.CV_32FC1
+        self.distort_map1, self.distort_map2 = cv2.initUndistortRectifyMap(
+            self.intrinsic, self.dist_coeffs, R, self.new_cam_mtx, (w, h), cv2.CV_16SC2
         )
-
+        
     def undistort(self, frame):
         """
-        Remove distorção de um frame capturado.
-
-        Args:
-            frame: imagem BGR como numpy array
-
-        Returns:
-            undistorted: imagem corrigida
+        Aplica o remapeamento pré-computado a cada frame capturado.
         """
-        return cv2.remap(frame, self.map1, self.map2, interpolation=cv2.INTER_LINEAR)
+        return cv2.remap(
+            frame,
+            self.distort_map1,
+            self.distort_map2,
+            interpolation=cv2.INTER_LINEAR
+        )
+
+    
