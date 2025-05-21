@@ -24,13 +24,13 @@ class ColorFilter:
             if area > self.BLOB_AREA_THRESHOLD:
                 # Desenha o ret�ngulo que envolve o objeto
                 x, y, w, h = cv2.boundingRect(contour)
-                cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 255, 0), 5)  # desenha o ret�ngulo (verde)
+                cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 255, 0), 2)  # desenha o ret�ngulo (verde)
 
                 # Desenha o centro do objeto
                 M = cv2.moments(contour)
                 if M["m00"] != 0:
                     cx = int(M["m10"] / M["m00"])
                     cy = int(M["m01"] / M["m00"])
-                    cv2.circle(frame, (cx, cy), 5, (255, 0, 0), -1)  # marca o centro (azul)
+                    cv2.circle(frame, (cx, cy), 5, (255, 0, 0), -4)  # marca o centro (azul)
         return frame #, cx, cy linha 118 main.py
 
