@@ -3,6 +3,7 @@ import sys
 import cv2
 import numpy as np
 import math
+from typing import Optional, Dict, Tuple, Any 
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QLabel, QPushButton,
     QVBoxLayout, QSizePolicy, QComboBox, QShortcut
@@ -28,23 +29,43 @@ class UpComboBox(QComboBox):
         
 class VisionProcessor:
     """
-    Encapsula a lógica de processamento de imagens: cálculo de centroide, cálculo de ângulo
-    e desenho de vetores com base em filtros HSV.
+    Classe responsável pelo processamento de imagens: detecção de centróides,
+    cálculo de ângulos e desenho de vetores com base em filtros HSV.
     """
-    def __init__(self, filters_hsv: dict, filter_proc: ColorFilter):
+    def __init__(self, filters_hsv: Dict[str, Dict[str, int]], filter_proc: ColorFilter) -> None:
+        """
+        Inicializa com os ranges HSV e o objeto ColorFilter.
+
+        :param filters_hsv: Dicionário de parâmetros HSV para cada cor.
+        :param filter_proc: Instância de ColorFilter para aplicar máscaras.
+        """
         self.filters_hsv = filters_hsv
         self.filter_proc = filter_proc
 
     @staticmethod
-    def encontrar_centroid(contorno: np.ndarray) -> tuple[int, int] | None:
+    def encontrar_centroid(contorno: np.ndarray) -> Optional[Tuple[int, int]]:
+        """
+        Calcula o centróide de um contorno.
+
+        :param contorno: Contorno em formato numpy.ndarray.
+        :return: Tupla (x, y) do centróide ou None se inválido.
+        """
         M = cv2.moments(contorno)
         if M.get("m00", 0) == 0:
             return None
         return (int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"]))
 
-    def calcular_angulo_robo(self, frame: np.ndarray) -> dict | None:
+    def calcular_angulo_robo(self, frame: np.ndarray) -> Optional[Dict[str, Any]]:
+        """
+        Processa o frame para encontrar os centróides das cores 'amarelo', 'rosa' e 'verde',
+        calcula o vetor entre 'amarelo' e o ponto médio entre 'rosa' e 'verde',
+        e retorna um dicionário com centros, vetor e ângulo.
+
+        :param frame: Imagem BGR capturada pela câmera.
+        :return: Dicionário {'centros':..., 'vetor':..., 'angulo':...} ou None.
+        """
         hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-        centroids: dict[str, tuple[int, int]] = {}
+        centroids: Dict[str, Tuple[int, int]] = {}
         for cor in ("rosa", "verde", "amarelo"):
             f = self.filters_hsv[cor]
             lower = np.array([f["h_min"], f["s_min"], f["v_min"]])
@@ -52,50 +73,78 @@ class VisionProcessor:
             mask = cv2.inRange(hsv, lower, upper)
             mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, np.ones((5,5), np.uint8))
             conts, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-            if not conts:
-                continue
-            cent = self.encontrar_centroid(max(conts, key=cv2.contourArea))
-            if cent:
-                centroids[cor] = cent
-        if all(k in centroids for k in ("amarelo","rosa","verde")):
+            if conts:
+                cent = self.encontrar_centroid(max(conts, key=cv2.contourArea))
+                if cent:
+                    centroids[cor] = cent
+        if all(k in centroids for k in ("amarelo", "rosa", "verde")):
             cx_a, cy_a = centroids["amarelo"]
             cx_r, cy_r = centroids["rosa"]
             cx_v, cy_v = centroids["verde"]
-            mx, my = (cx_r + cx_v)//2, (cy_r + cy_v)//2
+            mx, my = (cx_r + cx_v) // 2, (cy_r + cy_v) // 2
             vx, vy = mx - cx_a, my - cy_a
             ang = -math.degrees(math.atan2(vy, vx))
             return {"centros": centroids, "vetor": (vx, vy), "angulo": ang}
         return None
 
-    def calcular_vetor_laranja(self, hsv: np.ndarray, contoured: np.ndarray, res: dict | None) -> np.ndarray:
+    def calcular_vetor_laranja(
+        self,
+        hsv: np.ndarray,
+        contoured: np.ndarray,
+        res: Optional[Dict[str, Any]]
+    ) -> np.ndarray:
+        """
+        Desenha uma seta do ponto médio de 'rosa' e 'verde' até o centróide do objeto laranja,
+        se disponível.
+
+        :param hsv: Imagem em HSV.
+        :param contoured: Imagem BGR já com contornos desenhados.
+        :param res: Resultado do cálculo de ângulo principal.
+        :return: Imagem anotada com a seta laranja.
+        """
         if res is None:
             return contoured
-        vals = self.filters_hsv["laranja"]
+        f = self.filters_hsv["laranja"]
         mask = self.filter_proc.hsv_filter(
             hsv,
-            (vals["h_min"], vals["h_max"]),
-            (vals["s_min"], vals["s_max"]),
-            (vals["v_min"], vals["v_max"])
+            (f["h_min"], f["h_max"]),
+            (f["s_min"], f["s_max"]),
+            (f["v_min"], f["v_max"])
         )
         conts, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        if not conts or not all(c in res["centros"] for c in ("rosa","verde")):
-            return contoured
-        cent_o = self.encontrar_centroid(max(conts, key=cv2.contourArea))
-        if cent_o:
-            cx_o, cy_o = cent_o
-            (cx_r, cy_r), (cx_v, cy_v) = res["centros"]["rosa"], res["centros"]["verde"]
-            mx, my = (cx_r + cx_v)//2, (cy_r + cy_v)//2
-            cv2.arrowedLine(contoured, (mx, my), (cx_o, cy_o), (0,165,255), 2, tipLength=0.2)
-            ang_o = -math.degrees(math.atan2(cy_o - my, cx_o - mx))
-            cv2.putText(contoured, f"{ang_o:.1f}°", (cx_o+5, cy_o-5),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0,0,0), 2)
+        if conts and all(c in res["centros"] for c in ("rosa", "verde")):
+            cent_o = self.encontrar_centroid(max(conts, key=cv2.contourArea))
+            if cent_o:
+                cx_o, cy_o = cent_o
+                (cx_r, cy_r) = res["centros"]["rosa"]
+                (cx_v, cy_v) = res["centros"]["verde"]
+                mx, my = (cx_r + cx_v) // 2, (cy_r + cy_v) // 2
+                cv2.arrowedLine(contoured, (mx, my), (cx_o, cy_o), (0,165,255), 2, tipLength=0.2)
+                ang_o = -math.degrees(math.atan2(cy_o - my, cx_o - mx))
+                cv2.putText(
+                    contoured,
+                    f"{ang_o:.1f}°",
+                    (cx_o + 5, cy_o - 5),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.6,
+                    (0,0,0),
+                    2
+                )
         return contoured
 
+
 class MainWindow(QMainWindow):
+    """
+    Janela principal da aplicação que gerencia a interface, loop de câmera
+    e delega o processamento de imagens ao VisionProcessor.
+    """
     # Signal para envio de frames à janela de calibração
     frame_available = pyqtSignal(np.ndarray)
 
     def __init__(self):
+        """
+        Inicializa filtros, componentes da UI, câmera e atalhos de teclado.
+        """
         super().__init__()
         #self.serial = Serial('COM3')  # Inicializa a comunicação serial
         self.pid = PID(0, 0)
@@ -115,6 +164,9 @@ class MainWindow(QMainWindow):
 
 
     def _setup_filters(self):
+        """
+        Configura os ranges HSV, instância o ColorFilter e o VisionProcessor.
+        """
         # Inicializa os ranges HSV para cada cor
         self.filters_hsv = {
             "laranja": {"h_min": 10, "h_max": 25,  "s_min": 100, "s_max": 255, "v_min": 100, "v_max": 255},
@@ -130,6 +182,9 @@ class MainWindow(QMainWindow):
         
 
     def _setup_ui(self):
+        """
+        Constrói e organiza todos os widgets do Qt para visualização e controles.
+        """
         # Configuração da interface principal
         central = QWidget()
         self.setCentralWidget(central)
@@ -160,6 +215,9 @@ class MainWindow(QMainWindow):
         layout.addWidget(btn_calibrate)
 
     def _setup_camera(self):
+        """
+        Inicializa o dispositivo de captura, calibrador e timer para atualizações de frame.
+        """
         # Inicializa captura de vídeo e timer
         self.cap = cv2.VideoCapture('/dev/video2') # ('/dev/video2') para camera externa e (0) para webcam
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
@@ -182,6 +240,9 @@ class MainWindow(QMainWindow):
         self.frame_available.connect(self._send_frame_to_calibrator)
 
     def open_calibration(self):
+        """
+        Abre ou atualiza a janela de calibração HSV com os filtros atuais.
+        """
         # Cria ou reutiliza a janela de calibração
         if self.calibration_window is None:
             self.calibration_window = HSVFilterWindow(self.filters_hsv, self)
@@ -201,16 +262,28 @@ class MainWindow(QMainWindow):
         if selected in self.filters_hsv:
             self.calibration_window.load_filter(selected)
 
-    def _update_filters(self, new_filters):
+    def _update_filters(self, new_filters: Dict[str, Dict[str, int]])-> None:
+        """
+        Recebe novos ranges HSV proveniente da janela de calibração.
+
+        :param new_filters: Dicionário atualizado de filtros HSV.
+        """
         # Atualiza os ranges HSV com os valores calibrados
         self.filters_hsv = new_filters
 
-    def _send_frame_to_calibrator(self, frame):
+    def _send_frame_to_calibrator(self, frame: np.ndarray) -> None:
+        """
+        Envia o frame atual para a janela de calibração caso esteja visível.
+        """
         # Envia frame à janela de calibração se aberta
         if self.calibration_window and self.calibration_window.isVisible():
             self.calibration_window.receber_frame(frame)
 
-    def _update_frame(self):
+    def _update_frame(self) -> None:
+        """
+        Loop principal: captura, corrige distorção, aplica filtros, desenha vetores
+        e atualiza a UI.
+        """
         # Captura e processa o frame atual
         ret, frame = self.cap.read()
         if not ret:
@@ -266,7 +339,13 @@ class MainWindow(QMainWindow):
         self._display(self.label_original, contoured)
         self._display(self.label_filtered, filtered)
 
-    def _display(self, label, img):
+    def _display(self, label: QLabel, img: np.ndarray) -> None:
+        """
+        Converte imagem BGR para QPixmap e exibe no QLabel.
+
+        :param label: QLabel que receberá a imagem.
+        :param img: Frame BGR a ser exibido.
+        """
         # Converte imagem BGR para QPixmap para exibição no Qt
         rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         h, w, ch = rgb.shape
@@ -274,7 +353,10 @@ class MainWindow(QMainWindow):
         pix = QPixmap.fromImage(qimg).scaled(label.width(), label.height(), Qt.KeepAspectRatio)
         label.setPixmap(pix)
 
-    def closeEvent(self, event):
+    def closeEvent(self, event: Any) -> None:
+        """
+        Libera a câmera e fecha janelas OpenCV ao encerrar.
+        """
         # Garante liberação de recursos ao fechar
         self.cap.release()
         cv2.destroyAllWindows()
