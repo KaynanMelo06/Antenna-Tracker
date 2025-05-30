@@ -284,21 +284,29 @@ class MainWindow(QMainWindow):
         Loop principal: captura, corrige distorção, aplica filtros, desenha vetores
         e atualiza a UI.
         """
-        # Captura e processa o frame atual
+        frame = self._capturar_frame()
+        if frame is None:
+            return
+
+        sem_distorcao = self._remover_distorcao(frame)
+        contornado, filtrado = self._processar_filtros(sem_distorcao)
+        anotado = self._desenhar_vetores(sem_distorcao, contornado)
+        self._exibir_frames(sem_distorcao, filtrado, anotado)
+
+    def _capturar_frame(self) -> Optional[np.ndarray]:
         ret, frame = self.cap.read()
         if not ret:
-            return
-        
-        # Remove distorção usando CameraCalibrator
-        undistorted = self.calibrator.undistort(frame)
-        # Processamento HSV e desenho de vetores
-        hsv = cv2.cvtColor(undistorted, cv2.COLOR_BGR2HSV)
-        
-        # Filtra e aplica contornos
-        mask_total = np.zeros(hsv.shape[:2], dtype=np.uint8)
+            return None
+        return frame
 
-        selected = self.combo_filter.currentText()
-        if selected == "todos":
+    def _remover_distorcao(self, frame: np.ndarray) -> np.ndarray:
+        return self.calibrator.undistort(frame)
+
+    def _processar_filtros(self, sem_distorcao: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        hsv = cv2.cvtColor(sem_distorcao, cv2.COLOR_BGR2HSV)
+        mascara_total = np.zeros(hsv.shape[:2], dtype=np.uint8)
+        selecionado = self.combo_filter.currentText()
+        if selecionado == "todos":
             for vals in self.filters_hsv.values():
                 m = self.filter_proc.hsv_filter(
                     hsv,
@@ -306,39 +314,40 @@ class MainWindow(QMainWindow):
                     (vals["s_min"], vals["s_max"]),
                     (vals["v_min"], vals["v_max"])
                 )
-                mask_total = cv2.bitwise_or(mask_total, m)
+                mascara_total = cv2.bitwise_or(mascara_total, m)
         else:
-            vals = self.filters_hsv[selected]
-            mask_total = self.filter_proc.hsv_filter(
+            vals = self.filters_hsv[selecionado]
+            mascara_total = self.filter_proc.hsv_filter(
                 hsv,
                 (vals["h_min"], vals["h_max"]),
                 (vals["s_min"], vals["s_max"]),
                 (vals["v_min"], vals["v_max"])
             )
-        contoured = self.filter_proc.apply_contours(mask_total, undistorted.copy())
-        filtered = cv2.bitwise_and(undistorted, undistorted, mask=mask_total)
+        contornado = self.filter_proc.apply_contours(mascara_total, sem_distorcao.copy())
+        filtrado = cv2.bitwise_and(sem_distorcao, sem_distorcao, mask=mascara_total)
+        return contornado, filtrado
 
-        # calcula e desenha vetor de ângulo
-
-        res = self.vision.calcular_angulo_robo(undistorted)
+    def _desenhar_vetores(self, sem_distorcao: np.ndarray, contornado: np.ndarray) -> np.ndarray:
+        hsv = cv2.cvtColor(sem_distorcao, cv2.COLOR_BGR2HSV)
+        res = self.vision.calcular_angulo_robo(sem_distorcao)
         if res:
             vx, vy = res["vetor"]
             ang = res["angulo"]
             cx_a, cy_a = res["centros"]["amarelo"]
             pt0 = (cx_a, cy_a)
             pt1 = (cx_a + int(vx*1.5), cy_a + int(vy*1.5))
-            cv2.arrowedLine(contoured, pt0, pt1, (255,0,0), 2, tipLength=0.2)
-            cv2.putText(contoured, f"{ang:.1f}°", (pt1[0]+5, pt1[1]-5),
+            cv2.arrowedLine(contornado, pt0, pt1, (255,0,0), 2, tipLength=0.2)
+            cv2.putText(contornado, f"{ang:.1f}°", (pt1[0]+5, pt1[1]-5),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0,0,0), 2)
-        
-        # chama a função externa para vetor laranja
-        contoured = self.vision.calcular_vetor_laranja(hsv, contoured, res)
+        contornado = self.vision.calcular_vetor_laranja(hsv, contornado, res)
+        return contornado
 
-        # Exibe frames
-        self.frame_available.emit(undistorted)
-        self._display(self.label_original, contoured)
-        self._display(self.label_filtered, filtered)
-
+    def _exibir_frames(self, sem_distorcao: np.ndarray, filtrado: np.ndarray, anotado: np.ndarray) -> None:
+        self.frame_available.emit(sem_distorcao)
+        self._display(self.label_original, anotado)
+        self._display(self.label_filtered, filtrado)
+            
+            
     def _display(self, label: QLabel, img: np.ndarray) -> None:
         """
         Converte imagem BGR para QPixmap e exibe no QLabel.
