@@ -22,7 +22,7 @@ class ColorFilter:
         for contour in contours:
             area = cv2.contourArea(contour)
             if area > self.BLOB_AREA_THRESHOLD:
-                # Desenha o ret�ngulo que envolve o objeto
+                # Desenha o retangulo que envolve o objeto
                 x, y, w, h = cv2.boundingRect(contour)
                 cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 255, 0), 2)  # desenha o ret�ngulo (verde)
 

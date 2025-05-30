@@ -146,7 +146,7 @@ class MainWindow(QMainWindow):
             return None
         return (int(M["m10"]/M["m00"]), int(M["m01"]/M["m00"]))
 
-    def calcula_vetor_angulo(self, frame):
+    def calcula_angulo_robo(self, frame):
         hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
         centroids = {}
         # percorre cada cor de interesse (rosa, verde, amarelo) *MUDE AS TAGS/ID's MANUALMENTE AQUI* 
@@ -174,6 +174,33 @@ class MainWindow(QMainWindow):
             angulo = -1.0 * math.degrees(math.atan2(vy, vx))
             return {"vetor": (vx, vy), "angulo": angulo, "centros": centroids}
         return None
+
+    def calcular_vetor_laranja(self, hsv, contoured, res):
+        # --- VETOR DE BUSCA PARA OBJETO LARANJA ---
+        vals_o = self.filters_hsv["laranja"]
+        mask_o = self.filter_proc.hsv_filter(
+            hsv,
+            (vals_o["h_min"], vals_o["h_max"]),
+            (vals_o["s_min"], vals_o["s_max"]),
+            (vals_o["v_min"], vals_o["v_max"])
+        )
+        contours_o, _ = cv2.findContours(mask_o, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        if contours_o and res and all(c in res["centros"] for c in ("rosa", "verde")):
+            # calcula centróide da laranja
+            c = max(contours_o, key=cv2.contourArea)
+            M = cv2.moments(c)
+            if M["m00"] != 0:
+                cx_o = int(M["m10"] / M["m00"])
+                cy_o = int(M["m01"] / M["m00"])
+                # ponto médio entre rosa e verde
+                (cx_r, cy_r) = res["centros"]["rosa"]
+                (cx_v, cy_v) = res["centros"]["verde"]
+                mx, my = (cx_r + cx_v) // 2, (cy_r + cy_v) // 2
+                cv2.arrowedLine(contoured, (mx, my), (cx_o, cy_o), (0,165,255), 2, tipLength=0.2)
+                ang_o = -math.degrees(math.atan2(cy_o - my, cx_o - mx))
+                cv2.putText(contoured, f"{ang_o:.1f}°", (cx_o + 5, cy_o - 5),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0,0,0), 2)
+        return contoured
 
     def _update_frame(self):
         # Captura e processa o frame atual
@@ -211,7 +238,7 @@ class MainWindow(QMainWindow):
 
         # calcula e desenha vetor de ângulo
 
-        res = self.calcula_vetor_angulo(undistorted)
+        res = self.calcula_angulo_robo(undistorted)
         if res:
             vx, vy = res["vetor"]
             ang = res["angulo"]
@@ -221,35 +248,9 @@ class MainWindow(QMainWindow):
             cv2.arrowedLine(contoured, pt0, pt1, (255,0,0), 2, tipLength=0.2)
             cv2.putText(contoured, f"{ang:.1f}°", (pt1[0]+5, pt1[1]-5),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0,0,0), 2)
-            
-        # --- VETOR DE BUSCA PARA OBJETO LARANJA (a partir do meio das tags rosa e verde) ---
-        # Máscara da cor laranja
-        vals_o = self.filters_hsv["laranja"]
-        mask_o = self.filter_proc.hsv_filter(
-            hsv,
-            (vals_o["h_min"], vals_o["h_max"]),
-            (vals_o["s_min"], vals_o["s_max"]),
-            (vals_o["v_min"], vals_o["v_max"])
-        )
-        contours_o, _ = cv2.findContours(mask_o, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        # Desenha vetor somente se encontrou laranja e já há centros de rosa/verde
-        if contours_o and res and "rosa" in res["centros"] and "verde" in res["centros"]:
-            # centróide da laranja
-            c = max(contours_o, key=cv2.contourArea)
-            M = cv2.moments(c)
-            if M["m00"] != 0:
-                cx_o = int(M["m10"] / M["m00"])
-                cy_o = int(M["m01"] / M["m00"])
-                # ponto médio entre as tags rosa e verde
-                cx_r, cy_r = res["centros"]["rosa"]
-                cx_v, cy_v = res["centros"]["verde"]
-                mx, my = (cx_r + cx_v)//2, (cy_r + cy_v)//2
-                # desenha seta do meio das tags até o objeto laranja
-                cv2.arrowedLine(contoured, (mx, my), (cx_o, cy_o), (0,165,255), 2, tipLength=0.2)
-                # ângulo em graus
-                ang_o = -1.0 * math.degrees(math.atan2(cy_o - my, cx_o - mx))
-                cv2.putText(contoured, f"{ang_o:.1f}°", (cx_o + 5, cy_o - 5),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0,0,0), 2)
+        
+        # chama a função externa para vetor laranja
+        contoured = self.calcular_vetor_laranja(hsv, contoured, res)
 
         # Exibe frames
         self.frame_available.emit(undistorted)
