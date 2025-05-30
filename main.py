@@ -25,6 +25,71 @@ class UpComboBox(QComboBox):
         top_left = self.mapToGlobal(self.rect().topLeft())
         # reposiciona o popup para abrir pra cima
         popup.move(top_left.x(), top_left.y() - geo.height())
+        
+class VisionProcessor:
+    """
+    Encapsula a lógica de processamento de imagens: cálculo de centroide, cálculo de ângulo
+    e desenho de vetores com base em filtros HSV.
+    """
+    def __init__(self, filters_hsv: dict, filter_proc: ColorFilter):
+        self.filters_hsv = filters_hsv
+        self.filter_proc = filter_proc
+
+    @staticmethod
+    def encontrar_centroid(contorno: np.ndarray) -> tuple[int, int] | None:
+        M = cv2.moments(contorno)
+        if M.get("m00", 0) == 0:
+            return None
+        return (int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"]))
+
+    def calcular_angulo_robo(self, frame: np.ndarray) -> dict | None:
+        hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+        centroids: dict[str, tuple[int, int]] = {}
+        for cor in ("rosa", "verde", "amarelo"):
+            f = self.filters_hsv[cor]
+            lower = np.array([f["h_min"], f["s_min"], f["v_min"]])
+            upper = np.array([f["h_max"], f["s_max"], f["v_max"]])
+            mask = cv2.inRange(hsv, lower, upper)
+            mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, np.ones((5,5), np.uint8))
+            conts, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            if not conts:
+                continue
+            cent = self.encontrar_centroid(max(conts, key=cv2.contourArea))
+            if cent:
+                centroids[cor] = cent
+        if all(k in centroids for k in ("amarelo","rosa","verde")):
+            cx_a, cy_a = centroids["amarelo"]
+            cx_r, cy_r = centroids["rosa"]
+            cx_v, cy_v = centroids["verde"]
+            mx, my = (cx_r + cx_v)//2, (cy_r + cy_v)//2
+            vx, vy = mx - cx_a, my - cy_a
+            ang = -math.degrees(math.atan2(vy, vx))
+            return {"centros": centroids, "vetor": (vx, vy), "angulo": ang}
+        return None
+
+    def calcular_vetor_laranja(self, hsv: np.ndarray, contoured: np.ndarray, res: dict | None) -> np.ndarray:
+        if res is None:
+            return contoured
+        vals = self.filters_hsv["laranja"]
+        mask = self.filter_proc.hsv_filter(
+            hsv,
+            (vals["h_min"], vals["h_max"]),
+            (vals["s_min"], vals["s_max"]),
+            (vals["v_min"], vals["v_max"])
+        )
+        conts, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        if not conts or not all(c in res["centros"] for c in ("rosa","verde")):
+            return contoured
+        cent_o = self.encontrar_centroid(max(conts, key=cv2.contourArea))
+        if cent_o:
+            cx_o, cy_o = cent_o
+            (cx_r, cy_r), (cx_v, cy_v) = res["centros"]["rosa"], res["centros"]["verde"]
+            mx, my = (cx_r + cx_v)//2, (cy_r + cy_v)//2
+            cv2.arrowedLine(contoured, (mx, my), (cx_o, cy_o), (0,165,255), 2, tipLength=0.2)
+            ang_o = -math.degrees(math.atan2(cy_o - my, cx_o - mx))
+            cv2.putText(contoured, f"{ang_o:.1f}°", (cx_o+5, cy_o-5),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0,0,0), 2)
+        return contoured
 
 class MainWindow(QMainWindow):
     # Signal para envio de frames à janela de calibração
@@ -42,9 +107,12 @@ class MainWindow(QMainWindow):
         self._setup_camera()
         self.calibration_window = None
         self.showFullScreen()
+        self.vision: VisionProcessor
         #Keybinds para fechar o FullScreen
         esc = QShortcut(QKeySequence(Qt.Key_Escape), self)
         esc.activated.connect(self.close)
+        
+
 
     def _setup_filters(self):
         # Inicializa os ranges HSV para cada cor
@@ -55,9 +123,11 @@ class MainWindow(QMainWindow):
             "rosa":    {"h_min": 140,"h_max": 170,"s_min": 100, "s_max": 255, "v_min": 100, "v_max": 255},
             "amarelo": {"h_min": 25, "h_max": 35,  "s_min": 100, "s_max": 255, "v_min": 100, "v_max": 255},
         }
+        self.filter_proc = ColorFilter()
+        self.vision = VisionProcessor(self.filters_hsv, self.filter_proc)
         self.pid = PID(0, 0)
         # self.serial = Serial('COM3')  linux: '/dev/ttyUSB0'
-        self.filter_proc = ColorFilter()
+        
 
     def _setup_ui(self):
         # Configuração da interface principal
@@ -140,68 +210,6 @@ class MainWindow(QMainWindow):
         if self.calibration_window and self.calibration_window.isVisible():
             self.calibration_window.receber_frame(frame)
 
-    def encontrar_centroid(self, contorno):
-        M = cv2.moments(contorno)
-        if M["m00"] == 0:
-            return None
-        return (int(M["m10"]/M["m00"]), int(M["m01"]/M["m00"]))
-
-    def calcula_angulo_robo(self, frame):
-        hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-        centroids = {}
-        # percorre cada cor de interesse (rosa, verde, amarelo) *MUDE AS TAGS/ID's MANUALMENTE AQUI* 
-        for cor in ["rosa", "verde", "amarelo"]:
-            f = self.filters_hsv[cor]
-            lower = np.array([f["h_min"], f["s_min"], f["v_min"]])
-            upper = np.array([f["h_max"], f["s_max"], f["v_max"]])
-            mask = cv2.inRange(hsv, lower, upper)
-            mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, np.ones((5,5), np.uint8))
-            conts, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-            if not conts:
-                continue
-            c = max(conts, key=cv2.contourArea)
-            cent = self.encontrar_centroid(c)
-            if cent:
-                centroids[cor] = cent
-
-        if all(k in centroids for k in ("amarelo","rosa","verde")):
-            cx_a, cy_a = centroids["amarelo"]
-            cx_r, cy_r = centroids["rosa"]
-            cx_v, cy_v = centroids["verde"]
-            # ponto médio das duas frentes
-            mx, my = (cx_r + cx_v)//2, (cy_r + cy_v)//2
-            vx, vy = mx - cx_a, my - cy_a
-            angulo = -1.0 * math.degrees(math.atan2(vy, vx))
-            return {"vetor": (vx, vy), "angulo": angulo, "centros": centroids}
-        return None
-
-    def calcular_vetor_laranja(self, hsv, contoured, res):
-        # --- VETOR DE BUSCA PARA OBJETO LARANJA ---
-        vals_o = self.filters_hsv["laranja"]
-        mask_o = self.filter_proc.hsv_filter(
-            hsv,
-            (vals_o["h_min"], vals_o["h_max"]),
-            (vals_o["s_min"], vals_o["s_max"]),
-            (vals_o["v_min"], vals_o["v_max"])
-        )
-        contours_o, _ = cv2.findContours(mask_o, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        if contours_o and res and all(c in res["centros"] for c in ("rosa", "verde")):
-            # calcula centróide da laranja
-            c = max(contours_o, key=cv2.contourArea)
-            M = cv2.moments(c)
-            if M["m00"] != 0:
-                cx_o = int(M["m10"] / M["m00"])
-                cy_o = int(M["m01"] / M["m00"])
-                # ponto médio entre rosa e verde
-                (cx_r, cy_r) = res["centros"]["rosa"]
-                (cx_v, cy_v) = res["centros"]["verde"]
-                mx, my = (cx_r + cx_v) // 2, (cy_r + cy_v) // 2
-                cv2.arrowedLine(contoured, (mx, my), (cx_o, cy_o), (0,165,255), 2, tipLength=0.2)
-                ang_o = -math.degrees(math.atan2(cy_o - my, cx_o - mx))
-                cv2.putText(contoured, f"{ang_o:.1f}°", (cx_o + 5, cy_o - 5),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0,0,0), 2)
-        return contoured
-
     def _update_frame(self):
         # Captura e processa o frame atual
         ret, frame = self.cap.read()
@@ -210,9 +218,10 @@ class MainWindow(QMainWindow):
         
         # Remove distorção usando CameraCalibrator
         undistorted = self.calibrator.undistort(frame)
-
         # Processamento HSV e desenho de vetores
         hsv = cv2.cvtColor(undistorted, cv2.COLOR_BGR2HSV)
+        
+        # Filtra e aplica contornos
         mask_total = np.zeros(hsv.shape[:2], dtype=np.uint8)
 
         selected = self.combo_filter.currentText()
@@ -238,7 +247,7 @@ class MainWindow(QMainWindow):
 
         # calcula e desenha vetor de ângulo
 
-        res = self.calcula_angulo_robo(undistorted)
+        res = self.vision.calcular_angulo_robo(undistorted)
         if res:
             vx, vy = res["vetor"]
             ang = res["angulo"]
@@ -250,7 +259,7 @@ class MainWindow(QMainWindow):
                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0,0,0), 2)
         
         # chama a função externa para vetor laranja
-        contoured = self.calcular_vetor_laranja(hsv, contoured, res)
+        contoured = self.vision.calcular_vetor_laranja(hsv, contoured, res)
 
         # Exibe frames
         self.frame_available.emit(undistorted)
