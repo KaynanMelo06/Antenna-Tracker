@@ -171,7 +171,7 @@ class MainWindow(QMainWindow):
             # ponto médio das duas frentes
             mx, my = (cx_r + cx_v)//2, (cy_r + cy_v)//2
             vx, vy = mx - cx_a, my - cy_a
-            angulo = math.degrees(math.atan2(vy, vx))
+            angulo = -1.0 * math.degrees(math.atan2(vy, vx))
             return {"vetor": (vx, vy), "angulo": angulo, "centros": centroids}
         return None
 
@@ -220,7 +220,7 @@ class MainWindow(QMainWindow):
             pt1 = (cx_a + int(vx*1.5), cy_a + int(vy*1.5))
             cv2.arrowedLine(contoured, pt0, pt1, (255,0,0), 2, tipLength=0.2)
             cv2.putText(contoured, f"{ang:.1f}°", (pt1[0]+5, pt1[1]-5),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255,255,255), 2)
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0,0,0), 2)
             
         # --- VETOR DE BUSCA PARA OBJETO LARANJA (a partir do meio das tags rosa e verde) ---
         # Máscara da cor laranja
@@ -247,9 +247,9 @@ class MainWindow(QMainWindow):
                 # desenha seta do meio das tags até o objeto laranja
                 cv2.arrowedLine(contoured, (mx, my), (cx_o, cy_o), (0,165,255), 2, tipLength=0.2)
                 # ângulo em graus
-                ang_o = math.degrees(math.atan2(cy_o - my, cx_o - mx))
+                ang_o = -1.0 * math.degrees(math.atan2(cy_o - my, cx_o - mx))
                 cv2.putText(contoured, f"{ang_o:.1f}°", (cx_o + 5, cy_o - 5),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255,255,255), 2)
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0,0,0), 2)
 
         # Exibe frames
         self.frame_available.emit(undistorted)
