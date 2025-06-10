@@ -81,10 +81,3 @@ Captura vídeo, corrige distorção, detecta marcadores coloridos em tempo real,
    - Ajuste sliders de **H**, **S**, **V**.  
    - Use **Reset** para valores padrões ou **Apply** para aplicar novas faixas.
 
----
-
-## 🔧 Desenvolvimento
-
-- Rode exemplos em `src/aprender/` para entender como funciona a captura de vídeo e trackbars.  
-- Organize novos filtros ou lógica de processamento em `src/backend/`.  
-- Adicione novas janelas ou componentes em `src/ui/`.
