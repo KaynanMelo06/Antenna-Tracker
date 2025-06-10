@@ -43,13 +43,13 @@ Captura vídeo, corrige distorção, detecta marcadores coloridos em tempo real,
 - **Porta Serial**  
   Edite em `src/backend/comm/serial.py` ou via parâmetro na `MainWindow`:  
   ```python
-  self.serial = Serial(port="COM3", baudrate=115200)
+  self.serial = Serial(port="/dev/ttyUSB0", baudrate=115200)
   ```
 
 - **Índice da Câmera**  
   Altere em `src/ui/mainwindow.py`:  
   ```python
-  self.cap = cv2.VideoCapture(0)   # ou "/dev/video2"
+  self.cap = cv2.VideoCapture('/dev/video2')   # ou "0"
   ```
 
 - **Parâmetros PID**  
@@ -67,7 +67,7 @@ Captura vídeo, corrige distorção, detecta marcadores coloridos em tempo real,
 
 1. Inicie a aplicação:  
    ```bash
-   python main.py
+   python3 main.py
    ```
 
 2. Na janela principal:  
