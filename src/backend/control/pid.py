@@ -2,9 +2,9 @@ class PID :
     def __init__ (self, input, setpoint):
         self.input = input
         self.setpoint = setpoint
-        self.p_term = 0
-        self.i_term = 0
-        self.d_term = 0
+        self.p_term = 135.000
+        self.i_term = 0.000
+        self.d_term = 0.250
         self.error = self.last_error = 0
 
     def process (self, kp, ki, kd, outmin, outmax, input, setpoint):
