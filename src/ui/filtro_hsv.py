@@ -42,7 +42,7 @@ class Ui_HSVFilterWindow(object):
 
         # Color selection combo
         self.combo_filtro = QtWidgets.QComboBox()
-        self.combo_filtro.addItems(["laranja", "azul", "verde", "rosa", "amarelo"])
+        self.combo_filtro.addItems(["laranja", "verde", "rosa", "amarelo"])
         layout.addWidget(self.combo_filtro)
 
         MainWindow.setCentralWidget(central)

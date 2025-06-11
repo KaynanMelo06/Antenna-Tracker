@@ -6,9 +6,10 @@ import math
 from typing import Optional, Dict, Tuple, Any 
 from PyQt5.QtWidgets import (
     QMainWindow, QWidget, QLabel, QPushButton,
-    QVBoxLayout, QSizePolicy, QShortcut, QComboBox
+    QVBoxLayout, QSizePolicy, QShortcut, QComboBox, QHBoxLayout, QDoubleSpinBox
 )
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal
+import json, os
 from PyQt5.QtGui import QImage, QPixmap, QKeySequence
 from src.ui.filtro_hsv import HSVFilterWindow
 from src.backend.colorfilter import ColorFilter
@@ -30,6 +31,8 @@ class MainWindow(QMainWindow):
         Inicializa filtros, componentes da UI, câmera e atalhos de teclado.
         """
         super().__init__()
+        # Configura a status bar para mostrar alertas
+        self.statusBar().showMessage("Envio serial: PAUSADO")
         self.serial = Serial('/dev/ttyUSB0') #linux: '/dev/ttyUSB0' windows: 'COM3' # Inicializa a comunicação serial
         self.pid = PID(0, 0)
         self.sending = False
@@ -38,16 +41,17 @@ class MainWindow(QMainWindow):
         self.shortcut_toggle.activated.connect(self.toggle_sending)
         
         # --- Parâmetros do PID (ajuste conforme experimentação) ---
-        self.kp = 1.0    # Ganho proporcional
-        self.ki = 0.0    # Ganho integral (se for usar termo I)
-        self.kd = 0.1    # Ganho derivativo
-        self.outmin = -100  # Saída mínima (por exemplo, velocidade/motor de -100)
-        self.outmax = 100   # Saída máxima (por exemplo, velocidade/motor de +100)
-        # -----------------------------------------------------------
+        self.kp = 1.950    # Ganho proporcional
+        self.ki = 0.000    # Ganho integral (se for usar termo I)
+        self.kd = 0.200    # Ganho derivativo
+        self.outmin = -150  # Saída mínima (por exemplo, velocidade/motor de -100)
+        self.outmax = 150   # Saída máxima (por exemplo, velocidade/motor de +100)
         self.setWindowTitle("Antenna Tracker")
         self.resize(1024, 768)
         self.setMinimumSize(800, 600)
         self._setup_filters()
+        # Tenta carregar configurações salvas (PID + HSV)
+        self.load_config()
         self._setup_ui()
         self._setup_camera()
         self.calibration_window = None
@@ -66,7 +70,6 @@ class MainWindow(QMainWindow):
         # Inicializa os ranges HSV para cada cor
         self.filters_hsv = {
             "laranja": {"h_min": 10, "h_max": 25,  "s_min": 100, "s_max": 255, "v_min": 100, "v_max": 255},
-            "azul":    {"h_min": 100,"h_max": 130,"s_min": 100, "s_max": 255, "v_min": 100, "v_max": 255},
             "verde":   {"h_min": 35, "h_max": 85,  "s_min": 100, "s_max": 255, "v_min": 100, "v_max": 255},
             "rosa":    {"h_min": 140,"h_max": 170,"s_min": 100, "s_max": 255, "v_min": 100, "v_max": 255},
             "amarelo": {"h_min": 25, "h_max": 35,  "s_min": 100, "s_max": 255, "v_min": 100, "v_max": 255},
@@ -107,7 +110,7 @@ class MainWindow(QMainWindow):
         btn_calibrate = QPushButton("Calibrar HSV")
         btn_calibrate.clicked.connect(self.open_calibration)
         layout.addWidget(btn_calibrate)
-
+        
     def _setup_camera(self):
         """
         Inicializa o dispositivo de captura, calibrador e timer para atualizações de frame.
@@ -132,6 +135,40 @@ class MainWindow(QMainWindow):
         self.timer.timeout.connect(self._update_frame)
         self.timer.start(1) #(15)quanto menor mais fluido a imagem (fps)
         self.frame_available.connect(self._send_frame_to_calibrator)
+         
+    # === métodos novos para salvar/carregar configuração ===
+    def load_config(self):
+        """Carrega ganhos do PID e ranges HSV de config.json, se existir."""
+        cfg_file = "config.json"
+        if not os.path.exists(cfg_file):
+            return
+        try:
+            with open(cfg_file, "r") as f:
+                cfg = json.load(f)
+            # — HSV filters (só se já tiver chamado self._setup_filters()) —
+            for cor, params in cfg.get("filters_hsv", {}).items():
+                if cor in self.filters_hsv:
+                    for key, val in params.items():
+                        if key in self.filters_hsv[cor]:
+                            self.filters_hsv[cor][key] = int(val)
+        except Exception as e:
+            print(f"Erro ao carregar config.json: {e}")
+
+    def save_config(self):
+        """Salva ganhos do PID em config.json."""
+        cfg = {
+            "filters_hsv": self.filters_hsv
+        }
+        try:
+            with open("config.json", "w") as f:
+                json.dump(cfg, f, indent=4)
+        except Exception as e:
+            print(f"Erro ao salvar config.json: {e}")
+
+    def update_pid_param(self, name: str, value: float):
+        """Atualiza um ganho do PID e salva imediatamente."""
+        setattr(self, name, value)
+        self.save_config()
 
     def open_calibration(self):
         """
@@ -164,6 +201,8 @@ class MainWindow(QMainWindow):
         """
         # Atualiza os ranges HSV com os valores calibrados
         self.filters_hsv = new_filters
+        # salva imediatamente no config.json
+        self.save_config()
 
     def _send_frame_to_calibrator(self, frame: np.ndarray) -> None:
         """
@@ -224,10 +263,22 @@ class MainWindow(QMainWindow):
         return contornado, filtrado
 
     def toggle_sending(self):
-        """Inverte a flag de envio e mostra no título (opcional)."""
+        """
+        Inverte a flag de envio:
+        - Se estiver ativando, o PID voltará a mandar comandos no próximo frame.
+        - Se estiver desativando, envia imediatamente V=0 para parar o robô.
+        """
         self.sending = not self.sending
-        status = "ENVIANDO" if self.sending else "PAUSADO"
-        self.setWindowTitle(f"Antenna Tracker — {status}")
+        if self.sending:
+            msg = "Envio serial: ATIVADO"
+            self.setWindowTitle("Antenna Tracker — ENVIANDO")
+        else:
+            msg = "Envio serial: PAUSADO"
+            self.setWindowTitle("Antenna Tracker — PAUSADO")
+            # Envia comando de parada: left=0, right=0 (ID 3)
+            self.serial.sendData(3, 0, 0)
+        self.statusBar().showMessage(msg)
+
 
     def _desenhar_vetores(self, sem_distorcao: np.ndarray, contornado: np.ndarray) -> np.ndarray:
         # 1) Converte para HSV e obtém dados de orientação do robô (ângulo atual)
@@ -293,27 +344,36 @@ class MainWindow(QMainWindow):
                     ang_o
                 )
                 
-                currSpeed = 100
+                # currSpeed = 400
                 
-                if (ang >= 90.0 ):
-                    ang = 180.0 - ang
-                    leftspeed = -1 * currSpeed + controle
-                    rightspeed = -1 * currSpeed
-                elif(ang <= 0.0 and ang >=-90.0):
-                    ang = -1 * ang
-                    leftspeed = currSpeed
-                    rightspeed = currSpeed - controle
-                elif(ang < -90.0):
-                    ang = 180.0 + ang
-                    leftspeed = -1 * currSpeed
-                    rightspeed = -1 * currSpeed + controle
-                else:
-                    leftspeed = currSpeed - controle
-                    rightspeed = currSpeed
-                                    
-                # só envia se estiver “ligado”
-                if self.sending:        #primeiro parametro do sendData é o id
+                # if (ang >= 90.0 ):
+                #     ang = 180.0 - ang
+                #     leftspeed = -1 * currSpeed + controle
+                #     rightspeed = -1 * currSpeed
+                # elif(ang <= 0.0 and ang >=-90.0):
+                #     ang = -1 * ang
+                #     leftspeed = currSpeed
+                #     rightspeed = currSpeed - controle
+                # elif(ang < -90.0):
+                #     ang = 180.0 + ang
+                #     leftspeed = -1 * currSpeed
+                #     rightspeed = -1 * currSpeed + controle
+                # else:
+                #     leftspeed = currSpeed - controle
+                #     rightspeed = currSpeed
+                
+                # === gira em torno do próprio eixo para “olhar” a bola ===
+                # controle já é a saída do PID que mede (ang, ang_o)
+                leftspeed  = int(-controle)
+                rightspeed = int(+controle)
+                                                
+                # envia comandos de movimento ou de parada, conforme o flag
+                if self.sending:
+                    # PID manda a velocidade calculada
                     self.serial.sendData(3, int(leftspeed), int(rightspeed))
+                else:
+                    # enquanto estiver pausado, garanta que o robô receba 0,0 a cada frame
+                    self.serial.sendData(3, 0, 0)
                 
 
                 
