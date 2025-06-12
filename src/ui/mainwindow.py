@@ -32,20 +32,20 @@ class MainWindow(QMainWindow):
         """
         super().__init__()
         # Configura a status bar para mostrar alertas
-        self.statusBar().showMessage("Envio serial: PAUSADO")
+        self.statusBar().showMessage("Robo: PAUSADO")
         self.serial = Serial('/dev/ttyUSB0') #linux: '/dev/ttyUSB0' windows: 'COM3' # Inicializa a comunicação serial
         self.pid = PID(0, 0)
         self.sending = False
-        # Atalho para ligar/desligar envio serial
+        # Atalho para ligar/desligar robo
         self.shortcut_toggle = QShortcut(QKeySequence("k"), self)
         self.shortcut_toggle.activated.connect(self.toggle_sending)
         
         # --- Parâmetros do PID (ajuste conforme experimentação) ---
-        self.kp = 1.950    # Ganho proporcional
+        self.kp = 5.000    # Ganho proporcional
         self.ki = 0.000    # Ganho integral (se for usar termo I)
-        self.kd = 0.200    # Ganho derivativo
-        self.outmin = -150  # Saída mínima (por exemplo, velocidade/motor de -100)
-        self.outmax = 150   # Saída máxima (por exemplo, velocidade/motor de +100)
+        self.kd = 0.500    # Ganho derivativo
+        self.outmin = -200  # Saída mínima (por exemplo, velocidade/motor de -100)
+        self.outmax = 200   # Saída máxima (por exemplo, velocidade/motor de +100)
         self.setWindowTitle("Antenna Tracker")
         self.resize(1024, 768)
         self.setMinimumSize(800, 600)
@@ -55,7 +55,7 @@ class MainWindow(QMainWindow):
         self._setup_ui()
         self._setup_camera()
         self.calibration_window = None
-        self.showFullScreen()
+        self.show()          #win.showFullScreen() # abre em tela cheia  | #win.show() # abre em modo janela
         self.vision: VisionProcessor
         #Keybinds para fechar o FullScreen
         esc = QShortcut(QKeySequence(Qt.Key_Escape), self)
@@ -270,10 +270,10 @@ class MainWindow(QMainWindow):
         """
         self.sending = not self.sending
         if self.sending:
-            msg = "Envio serial: ATIVADO"
+            msg = "Robo: ATIVADO"
             self.setWindowTitle("Antenna Tracker — ENVIANDO")
         else:
-            msg = "Envio serial: PAUSADO"
+            msg = "Robo: PAUSADO"
             self.setWindowTitle("Antenna Tracker — PAUSADO")
             # Envia comando de parada: left=0, right=0 (ID 3)
             self.serial.sendData(3, 0, 0)

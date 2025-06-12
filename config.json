@@ -1,11 +1,11 @@
 {
     "filters_hsv": {
         "laranja": {
-            "h_min": 9,
-            "h_max": 27,
-            "s_min": 94,
-            "s_max": 156,
-            "v_min": 245,
+            "h_min": 7,
+            "h_max": 15,
+            "s_min": 144,
+            "s_max": 255,
+            "v_min": 152,
             "v_max": 255
         },
         "verde": {
@@ -13,23 +13,23 @@
             "h_max": 76,
             "s_min": 51,
             "s_max": 119,
-            "v_min": 193,
+            "v_min": 162,
             "v_max": 255
         },
         "rosa": {
-            "h_min": 158,
+            "h_min": 156,
             "h_max": 179,
-            "s_min": 98,
-            "s_max": 184,
-            "v_min": 215,
+            "s_min": 119,
+            "s_max": 226,
+            "v_min": 188,
             "v_max": 255
         },
         "amarelo": {
-            "h_min": 27,
-            "h_max": 41,
-            "s_min": 24,
-            "s_max": 138,
-            "v_min": 255,
+            "h_min": 17,
+            "h_max": 42,
+            "s_min": 49,
+            "s_max": 255,
+            "v_min": 213,
             "v_max": 255
         }
     }

@@ -32,7 +32,7 @@ class PID :
         self.last_error = self.error
         
         # Dead-band: não mexer se estiver “perto” do alvo
-        deadband = 25.0     # graus
+        deadband = 2.0     # graus
         if abs(self.error) < deadband:
             output = 0.0
         else:
