@@ -49,13 +49,13 @@ Captura vídeo, corrige distorção, detecta marcadores coloridos em tempo real,
 - **Índice da Câmera**  
   Altere em `src/ui/mainwindow.py`:  
   ```python
-  self.cap = cv2.VideoCapture('/dev/video2')   # ou "0"
+  self.cap = cv2.VideoCapture('/dev/video2')
   ```
 
 - **Parâmetros PID**  
   Ajuste em `src/backend/control/pid.py` ou diretamente na UI:  
   ```python
-  kp, ki, kd = 1.0, 0.01, 0.1
+  kp, ki, kd = 5.0, 0.00, 0.5
   ```
 
 - **Ranges HSV iniciais**  
@@ -73,7 +73,7 @@ Captura vídeo, corrige distorção, detecta marcadores coloridos em tempo real,
 2. Na janela principal:  
    - Visualize o **frame original** (com anotações) e o **frame filtrado**.  
    - Selecione a cor do marcador ou “Todos”.  
-   - Pressione **K** para ligar/pausar o envio de comandos serial.  
+   - Pressione **K** para ligar/pausar o robô.  
    - Pressione **Esc** para sair do fullscreen.
 
 3. Para calibrar HSV:  
