@@ -1,4 +1,4 @@
-# ProjetoAntena
+# Antenna Tracker
 
 Uma aplicação em Python com PyQt5 e OpenCV para rastreamento e controle de uma antena via microcontrolador.  
 Captura vídeo, corrige distorção, detecta marcadores coloridos em tempo real, calcula ângulos e utiliza um controlador PID para enviar comandos via serial.
