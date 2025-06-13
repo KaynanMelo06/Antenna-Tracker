@@ -1,7 +1,7 @@
 import time
 
-class PID : 
-    def __init__ (self, input, setpoint):
+class PID: 
+    def __init__(self, input: float, setpoint: float) -> None:
         self.input = input
         self.setpoint = setpoint
         self.p_term = 0.000
@@ -10,7 +10,16 @@ class PID :
         self.error = self.last_error = 0
         self.last_time   = time.time()   # armazena o instante da última chamada
 
-    def process (self, kp, ki, kd, outmin, outmax, input, setpoint):
+    def process(
+        self,
+        kp: float,
+        ki: float,
+        kd: float,
+        outmin: float,
+        outmax: float,
+        input: float,
+        setpoint: float,
+    ) -> float:
         # calcula dt
         now = time.time()
         dt  = now - self.last_time

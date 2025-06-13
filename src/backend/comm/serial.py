@@ -4,7 +4,7 @@ from PyQt5.QtCore import QByteArray, QObject
 
 
 class Serial(QObject):
-    def __init__(self, port_name="/dev/ttyUSB0"):
+    def __init__(self, port_name: str = "/dev/ttyUSB0") -> None:
         super().__init__()
 
         # Atributo que simula o “staticData->usb” do C++
@@ -29,12 +29,12 @@ class Serial(QObject):
         if self.port.isOpen():
             self.usb = True
 
-    def close(self):
+    def close(self) -> None:
         if self.port.isOpen():
             self.port.close()
             self.usb = False
 
-    def sendData(self, id, leftspeed, rightspeed):
+    def sendData(self, id: int, leftspeed: int, rightspeed: int) -> None:
         """
         Envia 'size' bytes vindos de 'data' pela serial, 
         mas somente se usb == True 

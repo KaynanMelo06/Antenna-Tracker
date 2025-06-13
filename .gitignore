@@ -1,6 +1,7 @@
 antena/
 .vscode/
-.qtcreator/ 
+.qtcreator/
+aprender/
 
 __pycache__/
 tempCodeRunnerFile.py

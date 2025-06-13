@@ -26,7 +26,7 @@ class MainWindow(QMainWindow):
     # Signal para envio de frames à janela de calibração
     frame_available = pyqtSignal(np.ndarray)
 
-    def __init__(self):
+    def __init__(self) -> None:
         """
         Inicializa filtros, componentes da UI, câmera e atalhos de teclado.
         """
@@ -63,7 +63,7 @@ class MainWindow(QMainWindow):
         
 
 
-    def _setup_filters(self):
+    def _setup_filters(self) -> None:
         """
         Configura os ranges HSV, instância o ColorFilter e o VisionProcessor.
         """
@@ -78,7 +78,7 @@ class MainWindow(QMainWindow):
         self.vision = VisionProcessor(self.filters_hsv, self.filter_proc)
         
 
-    def _setup_ui(self):
+    def _setup_ui(self) -> None:
         """
         Constrói e organiza todos os widgets do Qt para visualização e controles.
         """
@@ -111,7 +111,7 @@ class MainWindow(QMainWindow):
         btn_calibrate.clicked.connect(self.open_calibration)
         layout.addWidget(btn_calibrate)
         
-    def _setup_camera(self):
+    def _setup_camera(self) -> None:
         """
         Inicializa o dispositivo de captura, calibrador e timer para atualizações de frame.
         """
@@ -137,7 +137,7 @@ class MainWindow(QMainWindow):
         self.frame_available.connect(self._send_frame_to_calibrator)
          
     # === métodos novos para salvar/carregar configuração ===
-    def load_config(self):
+    def load_config(self) -> None:
         """Carrega ganhos do PID e ranges HSV de config.json, se existir."""
         cfg_file = "config.json"
         if not os.path.exists(cfg_file):
@@ -154,7 +154,7 @@ class MainWindow(QMainWindow):
         except Exception as e:
             print(f"Erro ao carregar config.json: {e}")
 
-    def save_config(self):
+    def save_config(self) -> None:
         """Salva ganhos do PID em config.json."""
         cfg = {
             "filters_hsv": self.filters_hsv
@@ -170,7 +170,7 @@ class MainWindow(QMainWindow):
         setattr(self, name, value)
         self.save_config()
 
-    def open_calibration(self):
+    def open_calibration(self) -> None:
         """
         Abre ou atualiza a janela de calibração HSV com os filtros atuais.
         """
@@ -262,7 +262,7 @@ class MainWindow(QMainWindow):
         filtrado = cv2.bitwise_and(sem_distorcao, sem_distorcao, mask=mascara_total)
         return contornado, filtrado
 
-    def toggle_sending(self):
+    def toggle_sending(self) -> None:
         """
         Inverte a flag de envio:
         - Se estiver ativando, o PID voltará a mandar comandos no próximo frame.

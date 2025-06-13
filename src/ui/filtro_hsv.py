@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from typing import Dict, Optional
 from PyQt5 import QtCore, QtWidgets
 from PyQt5.QtCore import pyqtSignal, Qt
 from PyQt5.QtGui import QImage, QPixmap
@@ -7,7 +8,7 @@ import numpy as np
 
 
 class Ui_HSVFilterWindow(object):
-    def setupUi(self, MainWindow):
+    def setupUi(self, MainWindow: QtWidgets.QMainWindow) -> None:
         MainWindow.setObjectName("HSVFilterWindow")
         MainWindow.resize(600, 400)
         central = QtWidgets.QWidget(MainWindow)
@@ -51,7 +52,7 @@ class Ui_HSVFilterWindow(object):
 class HSVFilterWindow(QtWidgets.QMainWindow):
     valores_aplicados = pyqtSignal(dict)
 
-    def __init__(self, filtros_iniciais, parent=None):
+    def __init__(self, filtros_iniciais: Dict[str, Dict[str, int]], parent: Optional[QtWidgets.QWidget] = None) -> None:
         super().__init__(parent)
         self.ui = Ui_HSVFilterWindow()
         self.ui.setupUi(self)
@@ -75,7 +76,7 @@ class HSVFilterWindow(QtWidgets.QMainWindow):
 
         self.load_filter(self.ui.combo_filtro.currentText())
 
-    def load_filter(self, filter_name):
+    def load_filter(self, filter_name: str) -> None:
         # Load values into sliders and labels
         settings = self.filtros[filter_name]
         if filter_name not in self.filtros:
@@ -87,29 +88,29 @@ class HSVFilterWindow(QtWidgets.QMainWindow):
             lbl.setText(f"{name.upper()}: {settings[name]}")
             sld.blockSignals(False)
 
-    def on_slider_change(self, name, value):
+    def on_slider_change(self, name: str, value: int) -> None:
         # Update dict and label
         current = self.ui.combo_filtro.currentText()
         self.filtros[current][name] = value
         lbl, _ = self.ui.sliders[name]
         lbl.setText(f"{name.upper()}: {value}")
 
-    def reset_sliders(self):
+    def reset_sliders(self) -> None:
         # Reset sliders to defaults
         for name, (lbl, sld) in self.ui.sliders.items():
             default = 0 if "min" in name else sld.maximum()
             sld.setValue(default)
 
-    def apply_filters(self):
+    def apply_filters(self) -> None:
         # Emit updated filters and close
         self.valores_aplicados.emit(self.filtros)
         self.close()
 
-    def receber_frame(self, frame):
+    def receber_frame(self, frame: np.ndarray) -> None:
         # Receive frame for preview
         self.current_frame = frame.copy()
 
-    def update_preview(self):
+    def update_preview(self) -> None:
         # Apply filter to frame and display
         if self.current_frame is None:
             return
@@ -131,7 +132,7 @@ class HSVFilterWindow(QtWidgets.QMainWindow):
         )
         self.ui.label_output.setPixmap(pix)
     
-    def closeEvent(self, event):
+    def closeEvent(self, event: QtCore.QEvent) -> None:
         super().closeEvent(event)
         # avisa o parent de que não há mais janela de calibração aberta
         if hasattr(self.parent(), 'calibration_window'):

@@ -2,9 +2,18 @@
 
 import cv2
 import numpy as np
+from typing import Sequence, Tuple
 
 class CameraCalibrator:
-    def __init__(self, fx, fy, cx, cy, dist_coeffs, image_size):
+    def __init__(
+        self,
+        fx: float,
+        fy: float,
+        cx: float,
+        cy: float,
+        dist_coeffs: Sequence[float],
+        image_size: Tuple[int, int],
+    ) -> None:
         """
         Inicializa o calibrador com parâmetros intrínsecos e coeficientes de distorção.
 
@@ -28,7 +37,7 @@ class CameraCalibrator:
         # Gera mapas de remapeamento
         self._compute_maps()
 
-    def _compute_maps(self):
+    def _compute_maps(self) -> None:
         w, h = self.image_size
         # Matriz de câmera otimizada para reduzir pixels pretos
         self.new_cam_mtx, _ = cv2.getOptimalNewCameraMatrix(
@@ -43,7 +52,7 @@ class CameraCalibrator:
             self.intrinsic, self.dist_coeffs, R, self.new_cam_mtx, (w, h), cv2.CV_16SC2
         )
         
-    def undistort(self, frame):
+    def undistort(self, frame: np.ndarray) -> np.ndarray:
         """
         Aplica o remapeamento pré-computado a cada frame capturado.
         """
@@ -53,5 +62,3 @@ class CameraCalibrator:
             self.distort_map2,
             interpolation=cv2.INTER_LINEAR
         )
-
-    

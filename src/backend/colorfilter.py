@@ -1,11 +1,18 @@
 import numpy as np
 import cv2
+from typing import Tuple
 
 class ColorFilter:
-    def __init__(self):
+    def __init__(self) -> None:
         self.BLOB_AREA_THRESHOLD = 100  # Limite de �rea para considerar um blob
 
-    def hsv_filter(self, hsv_image, hue_range, saturation_range, value_range):
+    def hsv_filter(
+        self,
+        hsv_image: np.ndarray,
+        hue_range: Tuple[int, int],
+        saturation_range: Tuple[int, int],
+        value_range: Tuple[int, int],
+    ) -> np.ndarray:
         # Define os limites inferior e superior para filtro HSV
         lower = np.array([hue_range[0], saturation_range[0], value_range[0]])
         upper = np.array([hue_range[1], saturation_range[1], value_range[1]])
@@ -15,7 +22,7 @@ class ColorFilter:
 
         return mask
     
-    def apply_contours(self, mask, frame):
+    def apply_contours(self, mask: np.ndarray, frame: np.ndarray) -> np.ndarray:
         # Encontra os contornos
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
@@ -32,5 +39,5 @@ class ColorFilter:
                     cx = int(M["m10"] / M["m00"])
                     cy = int(M["m01"] / M["m00"])
                     cv2.circle(frame, (cx, cy), 5, (255, 0, 0), -4)  # marca o centro (azul)
-        return frame #, cx, cy linha 118 main.py
+        return frame  # , cx, cy linha 118 main.py
 
