@@ -1,83 +1,82 @@
 # Antenna Tracker
 
-Uma aplicação em Python com PyQt5 e OpenCV para rastreamento e controle de uma antena via microcontrolador.  
-Captura vídeo, corrige distorção, detecta marcadores coloridos em tempo real, calcula ângulos e utiliza um controlador PID para enviar comandos via serial.
+A Python application using PyQt5 and OpenCV for real-time antenna tracking and control via microcontroller.  
+It captures video, corrects distortion, detects colored markers, computes angles, and uses a PID controller to send serial commands.
 
 ---
 
-## ✨ Funcionalidades
+## ✨ Features
 
-- Correção de distorção ótica (calibração de câmera).  
-- Detecção de marcadores HSV (laranja, rosa, verde, amarelo).  
-- Cálculo de posição e orientação do robô.  
-- Controle PID para ajuste fino da antena.  
-- Interface gráfica em PyQt5 para visualização e calibração.  
-- Comunicação serial (QSerialPort) com microcontrolador (baud rate configurável).
+- Optical distortion correction (camera calibration).  
+- HSV marker detection (orange, pink, green, yellow).  
+- Real-time robot position and orientation estimation.  
+- PID control for fine antenna adjustment.  
+- PyQt5 graphical interface for visualization and calibration.  
+- Serial communication (QSerialPort) with a microcontroller (configurable baud rate).
 
 ---
 
-## 🚀 Instalação
+## 🚀 Installation
 
-1. **Clone o repositório**  
+1. **Clone the repository**  
    ```bash
-   git clone https://github.com/seu-usuario/projetoantenaV1.git
+   git clone https://github.com/your-username/projetoantenaV1.git
    cd projetoantenaV1
    ```
 
-2. **Crie e ative um ambiente virtual**  
+2. **Create and activate a virtual environment**  
    ```bash
    python3 -m venv .venv
    source .venv/bin/activate   # Linux / macOS
    .venv\Scripts\activate      # Windows
    ```
 
-3. **Instale as dependências**  
+3. **Install the dependencies**  
    ```bash
    pip install -r requirements.txt
    ```
 
 ---
 
-## ⚙️ Configuração
+## ⚙️ Configuration
 
-- **Porta Serial**  
-  Edite em `src/backend/comm/serial.py` ou via parâmetro na `MainWindow`:  
+- **Serial Port**  
+  Set in `src/backend/comm/serial.py` or via parameter in `MainWindow`:  
   ```python
   self.serial = Serial(port="/dev/ttyUSB0", baudrate=115200)
   ```
 
-- **Índice da Câmera**  
-  Altere em `src/ui/mainwindow.py`:  
+- **Camera Index**  
+  Set in `src/ui/mainwindow.py`:  
   ```python
   self.cap = cv2.VideoCapture('/dev/video2')
   ```
 
-- **Parâmetros PID**  
-  Ajuste em `src/backend/control/pid.py` ou diretamente na UI:  
+- **PID Parameters**  
+  Adjust in `src/backend/control/pid.py` or directly through the UI:  
   ```python
   kp, ki, kd = 5.0, 0.00, 0.5
   ```
 
-- **Ranges HSV iniciais**  
-  Definidos em `src/ui/mainwindow.py`, mas podem ser calibrados em tempo real.
+- **Initial HSV Ranges**  
+  Defined in `src/ui/mainwindow.py`, but can be calibrated in real time.
 
 ---
 
-## 📈 Uso
+## 📈 Usage
 
-1. Inicie a aplicação:  
+1. Launch the application:  
    ```bash
    python3 main.py
    ```
 
-2. Na janela principal:  
-   - Visualize o **frame original** (com anotações) e o **frame filtrado**.  
-   - Selecione a cor do marcador ou “Todos”.  
-   - Pressione **K** para ligar/pausar o robô.  
-   - Pressione **Esc** para sair do fullscreen.
+2. In the main window:  
+   - View the **original frame** (with annotations) and the **filtered frame**.  
+   - Select the marker color or choose “All”.  
+   - Press **K** to start/pause the robot.  
+   - Press **Esc** to exit fullscreen.
 
-3. Para calibrar HSV:  
-   - Clique em **“Calibrar HSV”**.  
-   - Ajuste sliders de **H**, **S**, **V**.  
-   - Use **Reset** para valores padrões ou **Apply** para aplicar novas faixas.
-
+3. To calibrate HSV:  
+   - Click **“Calibrate HSV”**.  
+   - Adjust **H**, **S**, and **V** sliders.  
+   - Use **Reset** to revert to default values or **Apply** to save new ranges.
